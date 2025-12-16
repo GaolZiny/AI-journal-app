@@ -1,0 +1,153 @@
+import { config } from '../config';
+import type {
+    APIResponse,
+    DeleteResult,
+    QueryParams,
+    Transaction,
+    TransactionInput,
+    TransactionUpdate
+} from '../types';
+import { getIdToken } from './firebase';
+
+const N8N_BASE_URL = config.N8N_BASE_URL;
+
+// Webhook paths
+const WEBHOOKS = {
+    DATA_ENTRY: '/webhook/72fc1a9b-1807-45c5-a94b-8929bf40a224',
+    DATA_DELETE: '/webhook/957b0297-d509-4d97-9094-262d9bc27b29',
+    DATA_UPDATE: '/webhook/42950520-dff5-4bc6-8505-15a3078fb3ff',
+    AI_JOURNAL: '/webhook/42fd082c-bafd-47ac-b450-2f39b689e0d0',
+    DATA_QUERY: '/webhook/53aa1136-cd3b-4a55-9d0c-c00de74a888c'
+};
+
+// Generic API call helper
+async function apiCall<T>(
+    endpoint: string,
+    body: Record<string, unknown>
+): Promise<APIResponse<T>> {
+    const token = await getIdToken();
+
+    if (!token) {
+        return {
+            status: 'failed',
+            message: '未登录或登录已过期，请重新登录'
+        };
+    }
+
+    try {
+        const response = await fetch(`${N8N_BASE_URL}${endpoint}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        // Handle empty response
+        const text = await response.text();
+        if (!text) {
+            return {
+                status: 'failed',
+                message: '服务器返回空响应'
+            };
+        }
+
+        try {
+            const data = JSON.parse(text);
+            return data as APIResponse<T>;
+        } catch {
+            console.error('Failed to parse JSON response:', text.substring(0, 100));
+            return {
+                status: 'failed',
+                message: '服务器响应格式错误'
+            };
+        }
+    } catch (error) {
+        // Don't log network errors to console to reduce noise
+        return {
+            status: 'failed',
+            message: error instanceof Error ? error.message : '网络请求失败'
+        };
+    }
+}
+
+// Create a new transaction
+export async function createTransaction(
+    data: TransactionInput
+): Promise<APIResponse<Transaction>> {
+    return apiCall<Transaction>(WEBHOOKS.DATA_ENTRY, data as unknown as Record<string, unknown>);
+}
+
+// Delete transactions by IDs
+export async function deleteTransactions(
+    ids: string[]
+): Promise<APIResponse<DeleteResult[]>> {
+    return apiCall<DeleteResult[]>(WEBHOOKS.DATA_DELETE, {
+        target_list: ids
+    });
+}
+
+// Update a transaction
+export async function updateTransaction(
+    data: TransactionUpdate
+): Promise<APIResponse<Transaction>> {
+    return apiCall<Transaction>(WEBHOOKS.DATA_UPDATE, data as unknown as Record<string, unknown>);
+}
+
+// Process AI Journal for selected transactions
+export async function processAIJournal(
+    ids: string[]
+): Promise<APIResponse<Transaction[]>> {
+    if (ids.length > 100) {
+        return {
+            status: 'failed',
+            message: 'AI仕訳一次最多处理100条记录'
+        };
+    }
+
+    return apiCall<Transaction[]>(WEBHOOKS.AI_JOURNAL, {
+        target_list: ids
+    });
+}
+
+// Query transactions with filters
+export async function queryTransactions(
+    params: QueryParams
+): Promise<APIResponse<Transaction[]>> {
+    return apiCall<Transaction[]>(WEBHOOKS.DATA_QUERY, {
+        date_from: params.date_from || null,
+        date_to: params.date_to || null,
+        created_from: params.created_from || null,
+        created_to: params.created_to || null,
+        updated_from: params.updated_from || null,
+        updated_to: params.updated_to || null,
+        status_list: params.status_list || ['initialized', 'journaled', 'updated']
+    });
+}
+
+// Get default query params (last 60 days)
+export function getDefaultQueryParams(): QueryParams {
+    const today = new Date();
+    const sixtyDaysAgo = new Date(today);
+    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
+    return {
+        date_from: null,
+        date_to: null,
+        created_from: null,
+        created_to: null,
+        updated_from: formatDate(sixtyDaysAgo),
+        updated_to: formatDate(today),
+        status_list: ['initialized', 'journaled', 'updated']
+    };
+}
+
+// Helper function to format date as YYYY-MM-DD
+function formatDate(date: Date): string {
+    return date.toISOString().split('T')[0];
+}
