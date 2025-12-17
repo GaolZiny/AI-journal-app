@@ -152,6 +152,16 @@ export interface AIJournalResult {
     failed_list: string[];
 }
 
+// OCR识别结果
+export interface OCRResult {
+    transaction_date: string;   // 发生日期 YYYY-MM-DD
+    amount_total: number;       // 金额
+    fin_type: 1 | 2 | 3 | 4 | 5;  // 支付方式
+    tax_type: 1 | 2;            // 税务类型
+    tax_rate: 1 | 2 | 3 | 4;    // 税率
+    tax_amount: number;         // 税额
+}
+
 // Toast notification types
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 

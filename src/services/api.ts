@@ -2,6 +2,7 @@ import { config } from '../config';
 import type {
     APIResponse,
     DeleteResult,
+    OCRResult,
     QueryParams,
     Transaction,
     TransactionInput,
@@ -17,7 +18,8 @@ const WEBHOOKS = {
     DATA_DELETE: '/webhook/957b0297-d509-4d97-9094-262d9bc27b29',
     DATA_UPDATE: '/webhook/42950520-dff5-4bc6-8505-15a3078fb3ff',
     AI_JOURNAL: '/webhook/42fd082c-bafd-47ac-b450-2f39b689e0d0',
-    DATA_QUERY: '/webhook/53aa1136-cd3b-4a55-9d0c-c00de74a888c'
+    DATA_QUERY: '/webhook/53aa1136-cd3b-4a55-9d0c-c00de74a888c',
+    AI_OCR: '/webhook/4a8142b4-db3c-4ade-83e7-b03309ef0c59'
 };
 
 // Generic API call helper
@@ -148,4 +150,13 @@ export function getDefaultQueryParams(): QueryParams {
 // Helper function to format date as YYYY-MM-DD
 function formatDate(date: Date): string {
     return date.toISOString().split('T')[0];
+}
+
+// OCR receipt recognition
+export async function ocrReceipt(
+    imageBase64: string
+): Promise<APIResponse<OCRResult>> {
+    return apiCall<OCRResult>(WEBHOOKS.AI_OCR, {
+        image: imageBase64
+    });
 }
