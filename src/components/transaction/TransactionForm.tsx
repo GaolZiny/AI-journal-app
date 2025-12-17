@@ -29,7 +29,7 @@ const TAX_RATE_OPTIONS = [
     { value: 1, label: '8%' },
     { value: 2, label: '10%' },
     { value: 3, label: '8%10%混合' },
-    { value: 4, label: '其の他' }
+    { value: 4, label: '其他' }
 ];
 
 const FIN_TYPE_OPTIONS = [

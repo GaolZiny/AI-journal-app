@@ -1,4 +1,4 @@
-import { Plus, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
+import { ChevronDown, Plus, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Layout } from '../components/layout/Layout';
 import { ExportButton } from '../components/transaction/ExportButton';
@@ -56,6 +56,12 @@ export function DashboardPage() {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [showAIConfirm, setShowAIConfirm] = useState(false);
 
+    // 分页状态
+    const [currentOffset, setCurrentOffset] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const PAGE_SIZE = 20;
+
     // Load transactions
     const loadTransactions = useCallback(async (params?: QueryParams, useCache = true) => {
         // 验证交易数据是否有效
@@ -97,6 +103,10 @@ export function DashboardPage() {
                 const txList = rawList.filter(isValidTransaction);
                 setTransactions(txList);
 
+                // 重置分页状态
+                setCurrentOffset(0);
+                setHasMore(txList.length >= PAGE_SIZE);
+
                 // Save to cache if user is logged in
                 if (cacheKey && txList.length > 0) {
                     try {
@@ -110,15 +120,17 @@ export function DashboardPage() {
                 }
             } else {
                 setTransactions([]);
+                setHasMore(false);
                 // 不显示错误提示，因为后端目前不可用是预期情况
                 // 用户已经可以看到"暂无账目数据"的空状态
             }
         } catch {
             setLoading(false);
             setTransactions([]);
+            setHasMore(false);
             // 网络错误时也不显示 toast，空状态已说明问题
         }
-    }, [cacheKey, showToast]);
+    }, [cacheKey, showToast, PAGE_SIZE]);
 
     // 页面加载时滚动到顶部
     useEffect(() => {
@@ -244,6 +256,43 @@ export function DashboardPage() {
         loadTransactions(undefined, false);
     };
 
+    // 加载更多
+    const handleLoadMore = async () => {
+        if (loadingMore || !hasMore) return;
+
+        setLoadingMore(true);
+        const newOffset = currentOffset + PAGE_SIZE;
+
+        try {
+            const params = getDefaultQueryParams();
+            params.offset = newOffset;
+            params.limit = PAGE_SIZE;
+
+            const response = await queryTransactions(params);
+
+            if (response.status === 'successed' && response.detail) {
+                const rawList = Array.isArray(response.detail) ? response.detail : [];
+                const newTxList = rawList.filter((tx): tx is Transaction =>
+                    tx !== null && typeof tx === 'object' && 'id' in tx && typeof tx.id === 'string' && tx.id !== ''
+                );
+
+                if (newTxList.length > 0) {
+                    setTransactions(prev => [...prev, ...newTxList]);
+                    setCurrentOffset(newOffset);
+                    setHasMore(newTxList.length >= PAGE_SIZE);
+                } else {
+                    setHasMore(false);
+                }
+            } else {
+                setHasMore(false);
+            }
+        } catch {
+            showToast('error', '加载更多失败');
+        } finally {
+            setLoadingMore(false);
+        }
+    };
+
     // 只有在初始加载时才显示全屏加载状态
     // 搜索时不显示全屏加载，防止 SearchPanel 被卸载导致状态丢失
     const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -289,7 +338,7 @@ export function DashboardPage() {
                             disabled={loading}
                             icon={<RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />}
                         >
-                            近60天操作账目
+                            刷新列表
                         </Button>
                         <Button
                             onClick={() => setShowCreateModal(true)}
@@ -350,6 +399,28 @@ export function DashboardPage() {
                     loading={loading}
                     isSearchResult={isSearchActive}
                 />
+
+                {/* 加载更多按钮 */}
+                {!isSearchActive && hasMore && transactions.length > 0 && (
+                    <div className="mt-4 flex justify-center">
+                        <Button
+                            variant="secondary"
+                            onClick={handleLoadMore}
+                            loading={loadingMore}
+                            icon={<ChevronDown className="w-4 h-4" />}
+                        >
+                            加载更多
+                        </Button>
+                    </div>
+                )}
+
+                {/* 显示当前加载数量 */}
+                {!isSearchActive && transactions.length > 0 && (
+                    <p className="mt-2 text-center text-sm text-gray-400">
+                        已加载 {transactions.length} 条账目
+                        {!hasMore && '（已全部加载）'}
+                    </p>
+                )}
             </div>
 
             {/* 新增弹窗 */}

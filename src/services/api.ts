@@ -127,29 +127,31 @@ export async function queryTransactions(
         updated_from: params.updated_from || null,
         updated_to: params.updated_to || null,
         amount_type: params.transaction_type || null,  // n8n expects amount_type
-        status_list: params.status_list || ['initialized', 'journaled', 'updated']
+        status_list: params.status_list || ['initialized', 'journaled', 'updated'],
+        // 分页参数
+        limit: params.limit || null,
+        offset: params.offset || null,
+        // 排序参数
+        sort_by: params.sort_by || null,
+        sort_order: params.sort_order || null
     });
 }
 
-// Get default query params (last 60 days)
+// Get default query params (latest 50 records by updated_at)
 export function getDefaultQueryParams(): QueryParams {
-    const today = new Date();
-    const sixtyDaysAgo = new Date(today);
-    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-
     return {
         date_from: null,
         date_to: null,
-        updated_from: formatDate(sixtyDaysAgo),
-        updated_to: formatDate(today),
+        updated_from: null,
+        updated_to: null,
         transaction_type: undefined,
-        status_list: ['initialized', 'journaled', 'updated']
+        status_list: ['initialized', 'journaled', 'updated'],
+        // 默认获取最新20条
+        limit: 20,
+        offset: 0,
+        sort_by: 'updated_at',
+        sort_order: 'desc'
     };
-}
-
-// Helper function to format date as YYYY-MM-DD
-function formatDate(date: Date): string {
-    return date.toISOString().split('T')[0];
 }
 
 // OCR receipt recognition

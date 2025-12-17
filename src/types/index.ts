@@ -47,13 +47,22 @@ export const STATUS_COLORS: Record<TransactionStatus, string> = {
     updated: 'status-updated'
 };
 
-// 税率标签 ct_rate: 0=非课税, 1=8%, 2=10%, 3=混合, 4=其の他
+// 税率标签 ct_rate: 0=非课税, 1=8%, 2=10%, 3=混合, 4=其他
 export const CT_RATE_LABELS: Record<number, string> = {
     0: '非课税',
     1: '8%',
     2: '10%',
     3: '混合',
-    4: '其の他'
+    4: '其他'
+};
+
+// 税率标签（日语版，用于CSV导出）
+export const CT_RATE_LABELS_JP: Record<number, string> = {
+    0: '非課税',
+    1: '8%',
+    2: '10%',
+    3: '混合',
+    4: 'その他'
 };
 
 // Amount type labels (旧字段兼容)
@@ -93,7 +102,7 @@ export const TAX_RATE_LABELS: Record<1 | 2 | 3 | 4, string> = {
     1: '8%',
     2: '10%',
     3: '8%10%混合',
-    4: '其の他'
+    4: '其他'
 };
 
 // Fin type labels (支付/收款方式)
@@ -131,6 +140,12 @@ export interface QueryParams {
     updated_to?: string | null;
     transaction_type?: 1 | 2;  // 类型: 收入(1)/支出(2)
     status_list?: TransactionStatus[];
+    // 分页参数
+    limit?: number;
+    offset?: number;
+    // 排序参数
+    sort_by?: 'transaction_date' | 'updated_at' | 'created_at' | 'debit_amount' | 'credit_amount';
+    sort_order?: 'asc' | 'desc';
 }
 
 // API Response types

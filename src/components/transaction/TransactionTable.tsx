@@ -1,7 +1,16 @@
-import { ChevronDown, ChevronUp, Edit3, FileText } from 'lucide-react';
+import { ArrowDownWideNarrow, ChevronDown, ChevronUp, Edit3, FileText } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { Transaction } from '../../types';
 import { CT_RATE_LABELS, FIN_TYPE_LABELS, STATUS_COLORS, STATUS_LABELS, TRANSACTION_TYPE_LABELS } from '../../types';
+
+// 支付方式的标签颜色
+const FIN_TYPE_COLORS: Record<number, string> = {
+    1: 'bg-slate-100 text-slate-600',      // 现金 - 灰色
+    2: 'bg-blue-100 text-blue-600',        // 银行账户 - 蓝色
+    3: 'bg-violet-100 text-violet-600',    // 电子支付 - 紫色
+    4: 'bg-amber-100 text-amber-600',      // 个人信用卡 - 橙色
+    5: 'bg-orange-100 text-orange-700',    // 公司信用卡 - 深橙色
+};
 
 interface TransactionTableProps {
     transactions: Transaction[];
@@ -12,7 +21,7 @@ interface TransactionTableProps {
     isSearchResult?: boolean;  // 是否是搜索结果（用于显示不同的空状态消息）
 }
 
-type SortField = 'transaction_date' | 'debit_amount' | 'credit_amount';
+type SortField = 'transaction_date' | 'updated_at' | 'debit_amount' | 'credit_amount';
 type SortOrder = 'asc' | 'desc';
 
 export function TransactionTable({
@@ -38,6 +47,10 @@ export function TransactionTable({
                     aVal = new Date(a.transaction_date || '').getTime() || 0;
                     bVal = new Date(b.transaction_date || '').getTime() || 0;
                     break;
+                case 'updated_at':
+                    aVal = new Date(a.updated_at || '').getTime() || 0;
+                    bVal = new Date(b.updated_at || '').getTime() || 0;
+                    break;
                 case 'debit_amount':
                     aVal = a.debit_amount || 0;
                     bVal = b.debit_amount || 0;
@@ -62,6 +75,22 @@ export function TransactionTable({
             setSortField(field);
             setSortOrder('desc');
         }
+    };
+
+    // 移动端排序选项
+    const SORT_OPTIONS = [
+        { field: 'transaction_date' as SortField, order: 'desc' as SortOrder, label: '发生日期（新→旧）' },
+        { field: 'transaction_date' as SortField, order: 'asc' as SortOrder, label: '发生日期（旧→新）' },
+        { field: 'updated_at' as SortField, order: 'desc' as SortOrder, label: '更新日期（新→旧）' },
+        { field: 'updated_at' as SortField, order: 'asc' as SortOrder, label: '更新日期（旧→新）' },
+        { field: 'debit_amount' as SortField, order: 'desc' as SortOrder, label: '借方金额（高→低）' },
+        { field: 'debit_amount' as SortField, order: 'asc' as SortOrder, label: '借方金额（低→高）' },
+    ];
+
+    const handleMobileSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const [field, order] = e.target.value.split(':');
+        setSortField(field as SortField);
+        setSortOrder(order as SortOrder);
     };
 
     const handleSelectAll = () => {
@@ -123,7 +152,7 @@ export function TransactionTable({
                     </>
                 ) : (
                     <>
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">60天内没有进行账目的操作</h3>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">未发现近期进行操作的账目</h3>
                         <p className="text-gray-500 text-sm">点击上方"新增"按钮可添加账目，也可定义搜索条件进行搜索</p>
                     </>
                 )}
@@ -182,8 +211,15 @@ export function TransactionTable({
                             />
                             <TableHeader key="credit_ct" label="貸方税額" align="right" />
                             <TableHeader key="ct_rate" label="税率" align="center" />
-                            <TableHeader key="created_at" label="创建日" align="center" />
-                            <TableHeader key="updated_at" label="更新日" align="center" />
+                            <TableHeader
+                                key="updated_at"
+                                label="更新日"
+                                align="center"
+                                sortable
+                                active={sortField === 'updated_at'}
+                                order={sortOrder}
+                                onClick={() => handleSort('updated_at')}
+                            />
                             <TableHeader key="status" label="状态" align="center" />
                             <th key="actions" className="w-16 px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">
                                 操作
@@ -250,9 +286,6 @@ export function TransactionTable({
                                     {getCtRateLabel(tx.ct_rate)}
                                 </td>
                                 <td className="px-4 py-3 text-sm text-gray-500 text-center whitespace-nowrap">
-                                    {formatDate(tx.created_at)}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-gray-500 text-center whitespace-nowrap">
                                     {formatDate(tx.updated_at)}
                                 </td>
                                 <td className="px-4 py-3 text-center">
@@ -280,17 +313,35 @@ export function TransactionTable({
 
             {/* ===== 移动端/平板卡片视图 ===== */}
             <div className="lg:hidden">
-                {/* 全选栏 */}
-                <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center gap-3">
-                    <input
-                        type="checkbox"
-                        checked={allSelected}
-                        onChange={handleSelectAll}
-                        className="w-4 h-4"
-                    />
-                    <span className="text-sm text-gray-600">
-                        {selectedIds.length > 0 ? `已选择 ${selectedIds.length} 项` : '全选'}
-                    </span>
+                {/* 工具栏：全选 + 排序 */}
+                <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <input
+                            type="checkbox"
+                            checked={allSelected}
+                            onChange={handleSelectAll}
+                            className="w-4 h-4"
+                        />
+                        <span className="text-sm text-gray-600">
+                            {selectedIds.length > 0 ? `已选择 ${selectedIds.length} 项` : '全选'}
+                        </span>
+                    </div>
+
+                    {/* 排序下拉 */}
+                    <div className="flex items-center gap-2">
+                        <ArrowDownWideNarrow className="w-4 h-4 text-gray-500" />
+                        <select
+                            value={`${sortField}:${sortOrder}`}
+                            onChange={handleMobileSortChange}
+                            className="text-sm text-gray-700 bg-white border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                        >
+                            {SORT_OPTIONS.map((option, idx) => (
+                                <option key={idx} value={`${option.field}:${option.order}`}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
 
                 {/* 卡片列表 */}
@@ -314,18 +365,23 @@ export function TransactionTable({
 
                                 {/* 内容区 */}
                                 <div className="flex-1 min-w-0">
-                                    {/* 头部：日期 + 类型 + 状态 */}
+                                    {/* 头部：日期 + 类型 + 支付方式 + 状态 */}
                                     <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
                                             <span className="text-sm text-gray-500">
                                                 {formatDate(tx.transaction_date)}
                                             </span>
                                             {tx.transaction_type && (
                                                 <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${tx.transaction_type === 1
-                                                        ? 'bg-emerald-100 text-emerald-700'
-                                                        : 'bg-rose-100 text-rose-700'
+                                                    ? 'bg-emerald-100 text-emerald-700'
+                                                    : 'bg-rose-100 text-rose-700'
                                                     }`}>
                                                     {TRANSACTION_TYPE_LABELS[tx.transaction_type]}
+                                                </span>
+                                            )}
+                                            {tx.fin_type && (
+                                                <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${FIN_TYPE_COLORS[tx.fin_type] || 'bg-gray-100 text-gray-600'}`}>
+                                                    {FIN_TYPE_LABELS[tx.fin_type as 1 | 2 | 3 | 4 | 5]}
                                                 </span>
                                             )}
                                         </div>
@@ -374,16 +430,11 @@ export function TransactionTable({
                                         </div>
                                     </div>
 
-                                    {/* 底部：支付方式 + 税率 + 日期 + 编辑按钮 */}
+                                    {/* 底部：税率 + 更新日期 + 编辑按钮 */}
                                     <div className="flex items-center justify-between">
-                                        <div className="flex flex-col gap-0.5">
-                                            <span className="text-xs text-gray-500">
-                                                支付: {tx.fin_type ? FIN_TYPE_LABELS[tx.fin_type as 1 | 2 | 3 | 4 | 5] : '-'} | 税率: {getCtRateLabel(tx.ct_rate)}
-                                            </span>
-                                            <span className="text-xs text-gray-400">
-                                                创建: {formatDate(tx.created_at)} | 更新: {formatDate(tx.updated_at)}
-                                            </span>
-                                        </div>
+                                        <span className="text-xs text-gray-400">
+                                            税率: {getCtRateLabel(tx.ct_rate)} | 更新: {formatDate(tx.updated_at)}
+                                        </span>
                                         <button
                                             onClick={() => onEdit(tx)}
                                             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-lg transition-colors"

@@ -1,6 +1,6 @@
 import { Download } from 'lucide-react';
 import type { Transaction } from '../../types';
-import { CT_RATE_LABELS, FIN_TYPE_LABELS_JP, TRANSACTION_TYPE_LABELS_JP } from '../../types';
+import { CT_RATE_LABELS_JP, FIN_TYPE_LABELS_JP, TRANSACTION_TYPE_LABELS_JP } from '../../types';
 import { Button } from '../ui/Button';
 
 interface ExportButtonProps {
@@ -32,8 +32,8 @@ export function ExportButton({ transactions, selectedIds, disabled = false }: Ex
             '貸方金額',
             '貸方税額',
             '税率',
-            '创建时间',
-            '更新时间'
+            '記帳日時',
+            '更新日時'
         ];
 
         // Convert transactions to CSV rows - 使用日文标签
@@ -49,7 +49,7 @@ export function ExportButton({ transactions, selectedIds, disabled = false }: Ex
             t.credit_item || '',
             t.credit_amount || '',
             t.credit_ct || '',
-            t.ct_rate !== undefined ? CT_RATE_LABELS[t.ct_rate] || '' : '',
+            t.ct_rate !== undefined ? CT_RATE_LABELS_JP[t.ct_rate] || '' : '',
             t.created_at?.split('T')[0] || '',
             t.updated_at?.split('T')[0] || ''
         ]);
