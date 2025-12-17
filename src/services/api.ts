@@ -122,10 +122,9 @@ export async function queryTransactions(
     return apiCall<Transaction[]>(WEBHOOKS.DATA_QUERY, {
         date_from: params.date_from || null,
         date_to: params.date_to || null,
-        created_from: params.created_from || null,
-        created_to: params.created_to || null,
         updated_from: params.updated_from || null,
         updated_to: params.updated_to || null,
+        amount_type: params.transaction_type || null,  // n8n expects amount_type
         status_list: params.status_list || ['initialized', 'journaled', 'updated']
     });
 }
@@ -139,10 +138,9 @@ export function getDefaultQueryParams(): QueryParams {
     return {
         date_from: null,
         date_to: null,
-        created_from: null,
-        created_to: null,
         updated_from: formatDate(sixtyDaysAgo),
         updated_to: formatDate(today),
+        transaction_type: undefined,
         status_list: ['initialized', 'journaled', 'updated']
     };
 }

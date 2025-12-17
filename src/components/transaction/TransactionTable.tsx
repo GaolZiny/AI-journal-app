@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronUp, Edit3, FileText } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { Transaction } from '../../types';
-import { CT_RATE_LABELS, STATUS_COLORS, STATUS_LABELS } from '../../types';
+import { CT_RATE_LABELS, FIN_TYPE_LABELS, STATUS_COLORS, STATUS_LABELS, TRANSACTION_TYPE_LABELS } from '../../types';
 
 interface TransactionTableProps {
     transactions: Transaction[];
@@ -156,7 +156,9 @@ export function TransactionTable({
                                 order={sortOrder}
                                 onClick={() => handleSort('transaction_date')}
                             />
+                            <TableHeader key="transaction_type" label="类型" align="center" />
                             <TableHeader key="desc" label="概述" className="min-w-[180px]" />
+                            <TableHeader key="fin_type" label="支付方式" align="center" />
                             <TableHeader key="debit_item" label="借方科目" />
                             <TableHeader
                                 key="debit_amount"
@@ -208,10 +210,23 @@ export function TransactionTable({
                                 <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
                                     {formatDate(tx.transaction_date)}
                                 </td>
+                                <td className="px-4 py-3 text-sm text-center whitespace-nowrap">
+                                    {tx.transaction_type ? (
+                                        <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${tx.transaction_type === 1
+                                            ? 'bg-emerald-100 text-emerald-700'
+                                            : 'bg-rose-100 text-rose-700'
+                                            }`}>
+                                            {TRANSACTION_TYPE_LABELS[tx.transaction_type]}
+                                        </span>
+                                    ) : '-'}
+                                </td>
                                 <td className="px-4 py-3 text-sm text-gray-900 max-w-[200px]">
                                     <span className="line-clamp-2" title={tx.description || ''}>
                                         {tx.description || '-'}
                                     </span>
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-600 text-center whitespace-nowrap">
+                                    {tx.fin_type ? FIN_TYPE_LABELS[tx.fin_type as 1 | 2 | 3 | 4 | 5] : '-'}
                                 </td>
                                 <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
                                     {tx.debit_item || '-'}
@@ -299,11 +314,21 @@ export function TransactionTable({
 
                                 {/* 内容区 */}
                                 <div className="flex-1 min-w-0">
-                                    {/* 头部：日期 + 状态 */}
+                                    {/* 头部：日期 + 类型 + 状态 */}
                                     <div className="flex items-center justify-between mb-2">
-                                        <span className="text-sm text-gray-500">
-                                            {formatDate(tx.transaction_date)}
-                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm text-gray-500">
+                                                {formatDate(tx.transaction_date)}
+                                            </span>
+                                            {tx.transaction_type && (
+                                                <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${tx.transaction_type === 1
+                                                        ? 'bg-emerald-100 text-emerald-700'
+                                                        : 'bg-rose-100 text-rose-700'
+                                                    }`}>
+                                                    {TRANSACTION_TYPE_LABELS[tx.transaction_type]}
+                                                </span>
+                                            )}
+                                        </div>
                                         <span className={`
                                             inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full
                                             ${STATUS_COLORS[tx.status] || 'bg-gray-100 text-gray-600'}
@@ -349,11 +374,11 @@ export function TransactionTable({
                                         </div>
                                     </div>
 
-                                    {/* 底部：税率 + 日期 + 编辑按钮 */}
+                                    {/* 底部：支付方式 + 税率 + 日期 + 编辑按钮 */}
                                     <div className="flex items-center justify-between">
                                         <div className="flex flex-col gap-0.5">
                                             <span className="text-xs text-gray-500">
-                                                税率: {getCtRateLabel(tx.ct_rate)}
+                                                支付: {tx.fin_type ? FIN_TYPE_LABELS[tx.fin_type as 1 | 2 | 3 | 4 | 5] : '-'} | 税率: {getCtRateLabel(tx.ct_rate)}
                                             </span>
                                             <span className="text-xs text-gray-400">
                                                 创建: {formatDate(tx.created_at)} | 更新: {formatDate(tx.updated_at)}

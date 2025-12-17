@@ -230,8 +230,8 @@ export function DashboardPage() {
         // 检查是否有实际的搜索条件
         const hasSearchParams = !!(
             params.date_from || params.date_to ||
-            params.created_from || params.created_to ||
             params.updated_from || params.updated_to ||
+            params.transaction_type ||
             (params.status_list && params.status_list.length > 0)
         );
         setIsSearchActive(hasSearchParams);
@@ -420,6 +420,7 @@ export function DashboardPage() {
                                 description: editingTransaction.description,
                                 amount_total: calculatedAmount,
                                 amount_type: amountType,
+                                fin_type: (editingTransaction.fin_type as 1 | 2 | 3 | 4 | 5) || 1,
                                 tax_type: taxType,
                                 tax_rate: taxRate,
                                 tax_amount: taxAmount,

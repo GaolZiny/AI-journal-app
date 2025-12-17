@@ -12,6 +12,7 @@ export interface Transaction {
     transaction_date: string;  // 发生日期
     description: string;       // 概述
     transaction_type?: 1 | 2;  // 收入(1) / 支出(2)
+    fin_type?: 1 | 2 | 3 | 4 | 5;  // 支付/收款方式
     debit_item?: string;       // 借方科目
     debit_amount?: number;     // 借方金額
     debit_ct?: number;         // 借方税額
@@ -61,6 +62,26 @@ export const AMOUNT_TYPE_LABELS: Record<1 | 2, string> = {
     2: '支出'
 };
 
+// Transaction type labels for display
+export const TRANSACTION_TYPE_LABELS: Record<1 | 2, string> = {
+    1: '收入',
+    2: '支出'
+};
+
+// Japanese labels for CSV export
+export const TRANSACTION_TYPE_LABELS_JP: Record<1 | 2, string> = {
+    1: '収入',
+    2: '支出'
+};
+
+export const FIN_TYPE_LABELS_JP: Record<1 | 2 | 3 | 4 | 5, string> = {
+    1: '現金',
+    2: '銀行振込/デビット',
+    3: '電子マネー/QR決済',
+    4: '個人クレジットカード',
+    5: '法人クレジットカード'
+};
+
 // Tax type labels (旧字段兼容)
 export const TAX_TYPE_LABELS: Record<1 | 2, string> = {
     1: '非课税',
@@ -75,12 +96,22 @@ export const TAX_RATE_LABELS: Record<1 | 2 | 3 | 4, string> = {
     4: '其の他'
 };
 
+// Fin type labels (支付/收款方式)
+export const FIN_TYPE_LABELS: Record<1 | 2 | 3 | 4 | 5, string> = {
+    1: '现金',
+    2: '银行账户',
+    3: '电子支付',
+    4: '个人信用卡',
+    5: '公司信用卡'
+};
+
 // Form input types
 export interface TransactionInput {
     transaction_date: string;
     description: string;
     amount_total: number;
     amount_type: 1 | 2;
+    fin_type: 1 | 2 | 3 | 4 | 5;
     tax_type: 1 | 2;
     tax_rate?: 1 | 2 | 3 | 4;
     tax_amount?: number;
@@ -96,10 +127,9 @@ export interface TransactionUpdate extends TransactionInput {
 export interface QueryParams {
     date_from?: string | null;
     date_to?: string | null;
-    created_from?: string | null;
-    created_to?: string | null;
     updated_from?: string | null;
     updated_to?: string | null;
+    transaction_type?: 1 | 2;  // 类型: 收入(1)/支出(2)
     status_list?: TransactionStatus[];
 }
 

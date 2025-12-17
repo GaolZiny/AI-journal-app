@@ -29,6 +29,14 @@ const TAX_RATE_OPTIONS = [
     { value: 4, label: '其の他' }
 ];
 
+const FIN_TYPE_OPTIONS = [
+    { value: 1, label: '现金' },
+    { value: 2, label: '银行账户' },
+    { value: 3, label: '电子支付' },
+    { value: 4, label: '个人信用卡' },
+    { value: 5, label: '公司信用卡' }
+];
+
 export function TransactionForm({
     mode,
     initialData,
@@ -41,6 +49,7 @@ export function TransactionForm({
         description: '',
         amount_total: 0,
         amount_type: 2 as 1 | 2,
+        fin_type: 1 as 1 | 2 | 3 | 4 | 5,
         tax_type: 1 as 1 | 2,
         tax_rate: undefined as 1 | 2 | 3 | 4 | undefined,
         tax_amount: undefined as number | undefined,
@@ -61,6 +70,7 @@ export function TransactionForm({
                 description: initialData.description || '',
                 amount_total: initialData.amount_total || 0,
                 amount_type: initialData.amount_type || 2,
+                fin_type: initialData.fin_type || 1,
                 tax_type: initialData.tax_type || 1,
                 tax_rate: initialData.tax_rate,
                 tax_amount: initialData.tax_amount,
@@ -91,6 +101,25 @@ export function TransactionForm({
         }
         // 混合税率(tax_rate === 3)或其の他(tax_rate === 4)时不做任何处理，保留现有值
     }, [formData.amount_total, formData.tax_type, formData.tax_rate, mode, isInitialized]);
+
+    // 检查表单是否可以提交
+    const isFormValid = (): boolean => {
+        // 必填字段检查
+        if (!formData.transaction_date) return false;
+        if (!formData.description.trim()) return false;
+        if (formData.amount_total <= 0) return false;
+
+        // 税务相关检查
+        if (formData.tax_type === 2) {
+            if (!formData.tax_rate) return false;
+            // 混合税率或其の他时必须输入税额
+            if ((formData.tax_rate === 3 || formData.tax_rate === 4)) {
+                if (!formData.tax_amount || formData.tax_amount <= 0) return false;
+            }
+        }
+
+        return true;
+    };
 
     const validate = () => {
         const newErrors: Record<string, string> = {};
@@ -131,6 +160,7 @@ export function TransactionForm({
             description: formData.description,
             amount_total: formData.amount_total,
             amount_type: formData.amount_type,
+            fin_type: formData.fin_type,
             tax_type: formData.tax_type,
             tax_rate: formData.tax_type === 2 ? formData.tax_rate : undefined,
             tax_amount: formData.tax_type === 2 ? formData.tax_amount : undefined
@@ -156,33 +186,8 @@ export function TransactionForm({
     const needsManualTaxAmount = formData.tax_type === 2 && (formData.tax_rate === 3 || formData.tax_rate === 4);
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-5">
-            {/* 发生日期 */}
-            <div className="w-full overflow-hidden">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                    发生日期
-                </label>
-                <input
-                    type="date"
-                    value={formData.transaction_date}
-                    onChange={(e) => updateField('transaction_date', e.target.value)}
-                    style={{ boxSizing: 'border-box', minWidth: 0 }}
-                    className={`
-                        w-full max-w-full px-4 py-3 bg-white text-gray-900 border rounded-lg
-                        transition-all duration-200
-                        focus:outline-none focus:ring-2
-                        ${errors.transaction_date
-                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
-                            : 'border-gray-300 focus:border-sky-500 focus:ring-sky-500/20'
-                        }
-                    `}
-                />
-                {errors.transaction_date && (
-                    <p className="mt-2 text-sm text-red-500">{errors.transaction_date}</p>
-                )}
-            </div>
-
-            {/* 概述 */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+            {/* 1. 概述（最上面，2行高度） */}
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                     概述（付款方式默认现金，其他方式请注明。超10万日元支出请注明。可直接指定仕訳項目。）
@@ -190,7 +195,7 @@ export function TransactionForm({
                 <textarea
                     value={formData.description}
                     onChange={(e) => updateField('description', e.target.value)}
-                    rows={3}
+                    rows={2}
                     className={`
                         w-full px-4 py-3 bg-white text-gray-900 border rounded-lg resize-none
                         placeholder:text-gray-400 transition-all duration-200
@@ -207,7 +212,41 @@ export function TransactionForm({
                 )}
             </div>
 
-            {/* 金额和类型 */}
+            {/* 2. 发生日期 + 类型 */}
+            <div className="grid grid-cols-2 gap-4">
+                <div className="w-full overflow-hidden">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        发生日期
+                    </label>
+                    <input
+                        type="date"
+                        value={formData.transaction_date}
+                        onChange={(e) => updateField('transaction_date', e.target.value)}
+                        style={{ boxSizing: 'border-box', minWidth: 0 }}
+                        className={`
+                            w-full max-w-full px-4 py-3 bg-white text-gray-900 border rounded-lg
+                            transition-all duration-200
+                            focus:outline-none focus:ring-2
+                            ${errors.transaction_date
+                                ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                                : 'border-gray-300 focus:border-sky-500 focus:ring-sky-500/20'
+                            }
+                        `}
+                    />
+                    {errors.transaction_date && (
+                        <p className="mt-2 text-sm text-red-500">{errors.transaction_date}</p>
+                    )}
+                </div>
+
+                <Select
+                    label="类型"
+                    value={formData.amount_type}
+                    onChange={(e) => updateField('amount_type', Number(e.target.value) as 1 | 2)}
+                    options={AMOUNT_TYPE_OPTIONS}
+                />
+            </div>
+
+            {/* 3. 金额 + 支付/收款方式 */}
             <div className="grid grid-cols-2 gap-4">
                 <Input
                     label="金额"
@@ -220,14 +259,14 @@ export function TransactionForm({
                 />
 
                 <Select
-                    label="类型"
-                    value={formData.amount_type}
-                    onChange={(e) => updateField('amount_type', Number(e.target.value) as 1 | 2)}
-                    options={AMOUNT_TYPE_OPTIONS}
+                    label="支付/收款方式"
+                    value={formData.fin_type}
+                    onChange={(e) => updateField('fin_type', Number(e.target.value) as 1 | 2 | 3 | 4 | 5)}
+                    options={FIN_TYPE_OPTIONS}
                 />
             </div>
 
-            {/* 税务类型和税率 */}
+            {/* 4. 税务类型和税率 */}
             <div className="grid grid-cols-2 gap-4">
                 <Select
                     label="税务类型"
@@ -277,14 +316,14 @@ export function TransactionForm({
                         label="借方科目"
                         value={formData.debit_item}
                         onChange={(e) => updateField('debit_item', e.target.value)}
-                        placeholder="借方科目"
+                        placeholder="可为空"
                     />
 
                     <Input
                         label="貸方科目"
                         value={formData.credit_item}
                         onChange={(e) => updateField('credit_item', e.target.value)}
-                        placeholder="貸方科目"
+                        placeholder="可为空"
                     />
                 </div>
             )}
@@ -302,6 +341,7 @@ export function TransactionForm({
                 <Button
                     type="submit"
                     loading={loading}
+                    disabled={!isFormValid()}
                 >
                     {mode === 'create' ? '创建' : '保存'}
                 </Button>

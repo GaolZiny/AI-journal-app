@@ -1,6 +1,6 @@
 import { Download } from 'lucide-react';
 import type { Transaction } from '../../types';
-import { CT_RATE_LABELS } from '../../types';
+import { CT_RATE_LABELS, FIN_TYPE_LABELS_JP, TRANSACTION_TYPE_LABELS_JP } from '../../types';
 import { Button } from '../ui/Button';
 
 interface ExportButtonProps {
@@ -18,10 +18,12 @@ export function ExportButton({ transactions, selectedIds, disabled = false }: Ex
 
         if (dataToExport.length === 0) return;
 
-        // Define CSV headers - 日時, 備考, 不包含状态
+        // Define CSV headers - 使用日文表示
         const headers = [
             'ID',
             '日時',
+            '種類',           // transaction_type
+            '決済方法',       // fin_type
             '備考',
             '借方科目',
             '借方金額',
@@ -34,10 +36,12 @@ export function ExportButton({ transactions, selectedIds, disabled = false }: Ex
             '更新时间'
         ];
 
-        // Convert transactions to CSV rows - 不包含状态
+        // Convert transactions to CSV rows - 使用日文标签
         const rows = dataToExport.map(t => [
             t.id,
             t.transaction_date?.split('T')[0] || '',
+            t.transaction_type ? TRANSACTION_TYPE_LABELS_JP[t.transaction_type] : '',
+            t.fin_type ? FIN_TYPE_LABELS_JP[t.fin_type as 1 | 2 | 3 | 4 | 5] : '',
             `"${(t.description || '').replace(/"/g, '""')}"`,
             t.debit_item || '',
             t.debit_amount || '',

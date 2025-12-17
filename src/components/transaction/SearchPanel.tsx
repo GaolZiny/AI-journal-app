@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronUp, Search, X } from 'lucide-react';
 import { useState } from 'react';
 import type { QueryParams, TransactionStatus } from '../../types';
-import { STATUS_LABELS } from '../../types';
+import { STATUS_LABELS, TRANSACTION_TYPE_LABELS } from '../../types';
 import { Button } from '../ui/Button';
 
 interface SearchPanelProps {
@@ -10,27 +10,27 @@ interface SearchPanelProps {
 }
 
 const STATUS_OPTIONS: TransactionStatus[] = ['initialized', 'journaled', 'updated'];
+const TRANSACTION_TYPE_OPTIONS: (1 | 2)[] = [1, 2];
 
 export function SearchPanel({ onSearch, loading = false }: SearchPanelProps) {
     const [expanded, setExpanded] = useState(false);
 
     // 各筛选条件的启用状态
     const [enableTransactionDate, setEnableTransactionDate] = useState(false);
-    const [enableCreatedDate, setEnableCreatedDate] = useState(false);
+    const [enableTransactionType, setEnableTransactionType] = useState(false);
     const [enableUpdatedDate, setEnableUpdatedDate] = useState(false);
     const [enableStatus, setEnableStatus] = useState(false);
 
     // 筛选条件的值
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
-    const [createdFrom, setCreatedFrom] = useState('');
-    const [createdTo, setCreatedTo] = useState('');
     const [updatedFrom, setUpdatedFrom] = useState('');
     const [updatedTo, setUpdatedTo] = useState('');
+    const [transactionType, setTransactionType] = useState<1 | 2 | null>(null);
     const [statusList, setStatusList] = useState<TransactionStatus[]>([]);
 
     // 计算已启用的筛选条件数量
-    const enabledCount = [enableTransactionDate, enableCreatedDate, enableUpdatedDate, enableStatus].filter(Boolean).length;
+    const enabledCount = [enableTransactionDate, enableTransactionType, enableUpdatedDate, enableStatus].filter(Boolean).length;
 
     const handleStatusToggle = (status: TransactionStatus) => {
         if (statusList.includes(status)) {
@@ -40,29 +40,35 @@ export function SearchPanel({ onSearch, loading = false }: SearchPanelProps) {
         }
     };
 
+    const handleTransactionTypeToggle = (type: 1 | 2) => {
+        if (transactionType === type) {
+            setTransactionType(null);
+        } else {
+            setTransactionType(type);
+        }
+    };
+
     const handleSearch = () => {
         onSearch({
             date_from: enableTransactionDate ? (dateFrom || null) : null,
             date_to: enableTransactionDate ? (dateTo || null) : null,
-            created_from: enableCreatedDate ? (createdFrom || null) : null,
-            created_to: enableCreatedDate ? (createdTo || null) : null,
             updated_from: enableUpdatedDate ? (updatedFrom || null) : null,
             updated_to: enableUpdatedDate ? (updatedTo || null) : null,
+            transaction_type: enableTransactionType && transactionType ? transactionType : undefined,
             status_list: enableStatus && statusList.length > 0 ? statusList : undefined
         });
     };
 
     const handleReset = () => {
         setEnableTransactionDate(false);
-        setEnableCreatedDate(false);
+        setEnableTransactionType(false);
         setEnableUpdatedDate(false);
         setEnableStatus(false);
         setDateFrom('');
         setDateTo('');
-        setCreatedFrom('');
-        setCreatedTo('');
         setUpdatedFrom('');
         setUpdatedTo('');
+        setTransactionType(null);
         setStatusList([]);
         onSearch({});
     };
@@ -163,20 +169,31 @@ export function SearchPanel({ onSearch, loading = false }: SearchPanelProps) {
                             )}
                         </div>
 
-                        {/* 创建日期 */}
+                        {/* 类型（收入/支出）*/}
                         <div>
                             <FilterCheckbox
-                                checked={enableCreatedDate}
-                                onChange={setEnableCreatedDate}
-                                label="创建日期"
+                                checked={enableTransactionType}
+                                onChange={setEnableTransactionType}
+                                label="类型"
                             />
-                            {enableCreatedDate && (
-                                <DateRangeInput
-                                    fromValue={createdFrom}
-                                    toValue={createdTo}
-                                    onFromChange={setCreatedFrom}
-                                    onToChange={setCreatedTo}
-                                />
+                            {enableTransactionType && (
+                                <div className="flex flex-wrap gap-2 mt-2 ml-6 animate-fade-in">
+                                    {TRANSACTION_TYPE_OPTIONS.map((type) => (
+                                        <button
+                                            key={type}
+                                            onClick={() => handleTransactionTypeToggle(type)}
+                                            className={`
+                                                px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors
+                                                ${transactionType === type
+                                                    ? 'bg-sky-50 border-sky-300 text-sky-700'
+                                                    : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                                                }
+                                            `}
+                                        >
+                                            {TRANSACTION_TYPE_LABELS[type]}
+                                        </button>
+                                    ))}
+                                </div>
                             )}
                         </div>
 
