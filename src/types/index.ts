@@ -128,6 +128,7 @@ export interface TransactionInput {
 
 export interface TransactionUpdate extends TransactionInput {
     id: string;
+    status: TransactionStatus;  // 当前状态，发送给 webhook 进行处理
     debit_item?: string;
     credit_item?: string;
 }

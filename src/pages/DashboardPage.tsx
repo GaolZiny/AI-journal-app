@@ -487,6 +487,7 @@ export function DashboardPage() {
                             mode="edit"
                             initialData={{
                                 id: editingTransaction.id,
+                                status: editingTransaction.status,  // 传递当前状态给 webhook
                                 transaction_date: editingTransaction.transaction_date,
                                 description: editingTransaction.description,
                                 amount_total: calculatedAmount,

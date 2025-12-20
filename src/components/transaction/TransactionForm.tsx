@@ -162,6 +162,12 @@ export function TransactionForm({
             }
         }
 
+        // 编辑模式：如果原来有科目，不能清空
+        if (mode === 'edit' && initialData) {
+            if (initialData.debit_item && !formData.debit_item?.trim()) return false;
+            if (initialData.credit_item && !formData.credit_item?.trim()) return false;
+        }
+
         return true;
     };
 
@@ -202,6 +208,16 @@ export function TransactionForm({
             }
         }
 
+        // 编辑模式：如果原来有科目，不能清空
+        if (mode === 'edit' && initialData) {
+            if (initialData.debit_item && !formData.debit_item?.trim()) {
+                newErrors.debit_item = '借方科目不能清空';
+            }
+            if (initialData.credit_item && !formData.credit_item?.trim()) {
+                newErrors.credit_item = '贷方科目不能清空';
+            }
+        }
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -223,6 +239,7 @@ export function TransactionForm({
 
         if (mode === 'edit' && initialData) {
             (submitData as TransactionUpdate).id = initialData.id;
+            (submitData as TransactionUpdate).status = initialData.status;  // 发送当前状态给 webhook
             (submitData as TransactionUpdate).debit_item = formData.debit_item || undefined;
             (submitData as TransactionUpdate).credit_item = formData.credit_item || undefined;
         }
@@ -534,14 +551,16 @@ export function TransactionForm({
                             label="借方科目"
                             value={formData.debit_item}
                             onChange={(e) => updateField('debit_item', e.target.value)}
-                            placeholder="可为空"
+                            placeholder={initialData?.debit_item ? '不可清空' : '可为空'}
+                            error={errors.debit_item}
                         />
 
                         <Input
                             label="貸方科目"
                             value={formData.credit_item}
                             onChange={(e) => updateField('credit_item', e.target.value)}
-                            placeholder="可为空"
+                            placeholder={initialData?.credit_item ? '不可清空' : '可为空'}
+                            error={errors.credit_item}
                         />
                     </div>
                 )}
