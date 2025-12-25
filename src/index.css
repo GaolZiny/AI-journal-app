@@ -329,6 +329,18 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
 }
 
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out;
 }
@@ -339,6 +351,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .animate-scale-in {
   animation: scaleIn 0.2s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
 }
 
 /* ============================================
@@ -427,4 +443,16 @@ input[type="checkbox"] {
   line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* ============================================
+   Safe Area for Mobile Bottom Navigation
+   ============================================ */
+
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
 }

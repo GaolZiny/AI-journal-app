@@ -1,7 +1,7 @@
-import { ChevronDown, Plus, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Layout } from '../components/layout/Layout';
-import { LedgerResult, TrialBalanceResult } from '../components/report';
 import { ExportButton } from '../components/transaction/ExportButton';
 import { SearchPanel } from '../components/transaction/SearchPanel';
 import { TransactionForm } from '../components/transaction/TransactionForm';
@@ -15,23 +15,20 @@ import { useToast } from '../contexts/ToastContext';
 import {
     createTransaction,
     deleteTransactions,
-    generateSummary,
     getDefaultQueryParams,
     processAIJournal,
     queryTransactions,
     updateTransaction
 } from '../services/api';
 import type {
-    LedgerResponse,
     QueryParams,
-    SummaryRequest,
     Transaction,
     TransactionInput,
-    TransactionUpdate,
-    TrialBalanceResponse
+    TransactionUpdate
 } from '../types';
 
 const CACHE_KEY_PREFIX = 'journal_transactions_';
+const CACHE_KEY_UNINITIALIZED_PREFIX = 'journal_uninitialized_';
 const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
 
 interface CachedData {
@@ -39,18 +36,26 @@ interface CachedData {
     timestamp: number;
 }
 
+// 页面标题类型
+type PageTitleType = 'recent' | 'uninitialized' | 'search';
+
 export function DashboardPage() {
     const { user } = useAuth();
     const { showToast } = useToast();
+    const location = useLocation();
 
     // 用户专属的缓存键
     const cacheKey = user?.uid ? `${CACHE_KEY_PREFIX}${user.uid}` : null;
+    const uninitializedCacheKey = user?.uid ? `${CACHE_KEY_UNINITIALIZED_PREFIX}${user.uid}` : null;
 
     // Data state
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
+
+    // 页面标题类型
+    const [titleType, setTitleType] = useState<PageTitleType>('recent');
 
     // Modal state
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -66,14 +71,6 @@ export function DashboardPage() {
     const [hasMore, setHasMore] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     const PAGE_SIZE = 20;
-
-    // 账表生成状态
-    const [reportLoading, setReportLoading] = useState(false);
-    const [showLedgerResult, setShowLedgerResult] = useState(false);
-    const [showTrialBalanceResult, setShowTrialBalanceResult] = useState(false);
-    const [ledgerData, setLedgerData] = useState<LedgerResponse | null>(null);
-    const [trialBalanceData, setTrialBalanceData] = useState<TrialBalanceResponse | null>(null);
-    const [reportDateRange, setReportDateRange] = useState({ from: '', to: '' });
 
     // Load transactions
     const loadTransactions = useCallback(async (params?: QueryParams, useCache = true) => {
@@ -114,14 +111,13 @@ export function DashboardPage() {
                 // 过滤掉无效的交易记录
                 const rawList = Array.isArray(response.detail) ? response.detail : [];
                 const txList = rawList.filter(isValidTransaction);
-                setTransactions(txList);
 
-                // 重置分页状态
+                setTransactions(txList);
                 setCurrentOffset(0);
                 setHasMore(txList.length >= PAGE_SIZE);
 
-                // Save to cache if user is logged in
-                if (cacheKey && txList.length > 0) {
+                // Save to localStorage cache
+                if (cacheKey && !params) {
                     try {
                         localStorage.setItem(cacheKey, JSON.stringify({
                             transactions: txList,
@@ -134,25 +130,70 @@ export function DashboardPage() {
             } else {
                 setTransactions([]);
                 setHasMore(false);
-                // 不显示错误提示，因为后端目前不可用是预期情况
-                // 用户已经可以看到"暂无账目数据"的空状态
             }
         } catch {
             setLoading(false);
             setTransactions([]);
             setHasMore(false);
-            // 网络错误时也不显示 toast，空状态已说明问题
         }
-    }, [cacheKey, showToast, PAGE_SIZE]);
+    }, [cacheKey, PAGE_SIZE]);
+
+    /**
+     * 清除未仕訳账目的缓存（当数据修改时调用）
+     * 这样首页在下次访问时会重新获取数据
+     */
+    const clearUninitializedCache = useCallback(() => {
+        if (uninitializedCacheKey) {
+            try {
+                localStorage.removeItem(uninitializedCacheKey);
+            } catch {
+                // Ignore cache errors
+            }
+        }
+    }, [uninitializedCacheKey]);
 
     // 页面加载时滚动到顶部
     useEffect(() => {
         window.scrollTo(0, 0);
     }, []);
 
+    // 初始加载：检查是否有从首页传递的预加载数据，否则使用 localStorage 缓存
     useEffect(() => {
-        loadTransactions();
-    }, [loadTransactions]);
+        const state = location.state as {
+            preloadedTransactions?: Transaction[];
+            filterType?: 'uninitialized' | 'recent';
+            isSearchResult?: boolean;
+            openCreate?: boolean;
+        } | null;
+
+        if (state?.preloadedTransactions && state.preloadedTransactions.length > 0) {
+            // 从首页传递的预加载数据（如未仕訳账目），直接使用
+            setTransactions(state.preloadedTransactions);
+
+            if (state.filterType === 'uninitialized') {
+                setTitleType('uninitialized');
+                setHasMore(false);
+            } else {
+                setTitleType('recent');
+                setHasMore(state.preloadedTransactions.length >= 20);
+            }
+
+            setLoading(false);
+            window.history.replaceState({}, document.title);
+        } else if (state?.openCreate) {
+            // 从首页"新增账目"跳转来，加载数据（会使用 localStorage 缓存）并打开创建弹窗
+            setTitleType('recent');
+            loadTransactions();
+            setShowCreateModal(true);
+            window.history.replaceState({}, document.title);
+        } else {
+            // 正常加载（直接从导航栏进入）
+            // loadTransactions 会自动检查 localStorage 缓存
+            setTitleType('recent');
+            loadTransactions();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Create transaction
     const handleCreate = async (data: TransactionInput) => {
@@ -164,6 +205,8 @@ export function DashboardPage() {
             if (response.status === 'successed') {
                 showToast('success', '账目创建成功');
                 setShowCreateModal(false);
+                clearUninitializedCache();
+                setTitleType('recent');
                 loadTransactions(undefined, false);
             } else {
                 showToast('error', response.message || '创建失败');
@@ -188,6 +231,8 @@ export function DashboardPage() {
 
             if (response.status === 'successed') {
                 showToast('success', '账目更新成功');
+                clearUninitializedCache();
+                setTitleType('recent');
                 loadTransactions(undefined, false);
             } else {
                 showToast('error', response.message || '更新失败');
@@ -214,6 +259,8 @@ export function DashboardPage() {
         if (response.status === 'successed') {
             showToast('success', `成功删除 ${selectedIds.length} 条账目`);
             setSelectedIds([]);
+            clearUninitializedCache();
+            setTitleType('recent');
             loadTransactions(undefined, false);
         } else {
             showToast('error', response.message || '删除失败');
@@ -236,6 +283,8 @@ export function DashboardPage() {
         if (response.status === 'successed') {
             showToast('success', 'AI仕訳处理完成');
             setSelectedIds([]);
+            clearUninitializedCache();
+            setTitleType('recent');
             loadTransactions(undefined, false);
         } else {
             showToast('error', response.message || 'AI处理失败');
@@ -249,8 +298,6 @@ export function DashboardPage() {
     };
 
     // Search handler
-    const [isSearchActive, setIsSearchActive] = useState(false);
-
     const handleSearch = (params: QueryParams) => {
         // 检查是否有实际的搜索条件
         const hasSearchParams = !!(
@@ -259,67 +306,16 @@ export function DashboardPage() {
             params.transaction_type ||
             (params.status_list && params.status_list.length > 0)
         );
-        setIsSearchActive(hasSearchParams);
+        if (hasSearchParams) {
+            setTitleType('search');
+        }
         loadTransactions(params, false);
     };
 
-    // Refresh handler
-    const handleRefresh = () => {
-        setIsSearchActive(false);
+    // Reset and refresh handler
+    const handleReset = () => {
+        setTitleType('recent');
         loadTransactions(undefined, false);
-    };
-
-    // 账表生成处理
-    const handleGenerateReport = async (params: SummaryRequest) => {
-        setReportLoading(true);
-        setReportDateRange({ from: params.date_from, to: params.date_to });
-
-        try {
-            const response = await generateSummary(params);
-
-            if (response.status === 'successed' && response.detail) {
-                if (params.summary_type === 1) {
-                    // 総勘定元帳
-                    setLedgerData(response.detail as LedgerResponse);
-                    setShowLedgerResult(true);
-                } else {
-                    // 試算表
-                    setTrialBalanceData(response.detail as TrialBalanceResponse);
-                    setShowTrialBalanceResult(true);
-                }
-            } else {
-                // 处理错误
-                const message = response.message || '生成失败';
-
-                if (message.includes('initialized records')) {
-                    // 存在未记账数据
-                    showToast('warning', '存在未执行 AI仕訳 的账目，已显示在列表中。请选择账目执行 AI仕訳 后，再次尝试生成账表。');
-                    // 将未处理的数据载入到 Dashboard
-                    const initializedRecords = response.detail as unknown as Transaction[];
-                    if (Array.isArray(initializedRecords) && initializedRecords.length > 0) {
-                        setTransactions(initializedRecords);
-                        setIsSearchActive(false);
-                    }
-                } else if (message.includes('Authentication')) {
-                    showToast('error', '登录已过期，请重新登录');
-                } else if (message.includes('No available records')) {
-                    showToast('info', '该期间内没有可生成账表的账目');
-                } else if (message.includes('Input data')) {
-                    showToast('error', '输入参数有误，请检查日期格式');
-                } else if (message.includes('Database')) {
-                    showToast('error', '服务器错误，请稍后重试');
-                } else if (message.includes('Switch')) {
-                    showToast('error', '系统错误，请联系管理员');
-                } else {
-                    showToast('error', message);
-                }
-            }
-        } catch (error) {
-            console.error('Generate report error:', error);
-            showToast('error', '生成账表失败');
-        } finally {
-            setReportLoading(false);
-        }
     };
 
     // 加载更多
@@ -359,6 +355,19 @@ export function DashboardPage() {
         }
     };
 
+    // 动态获取页面标题
+    const getPageTitle = (): string => {
+        switch (titleType) {
+            case 'uninitialized':
+                return '未进行仕訳账目';
+            case 'search':
+                return '搜索结果';
+            case 'recent':
+            default:
+                return '最近更新账目';
+        }
+    };
+
     // 只有在初始加载时才显示全屏加载状态
     // 搜索时不显示全屏加载，防止 SearchPanel 被卸载导致状态丢失
     const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -382,83 +391,26 @@ export function DashboardPage() {
 
     return (
         <Layout>
-            <div className="space-y-6">
-                {/* 页面标题 */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">账目列表</h1>
-                        <p className="text-gray-500 text-sm mt-1">
-                            共 {transactions.length} 条记录
-                            {selectedIds.length > 0 && (
-                                <span className="text-sky-600 font-medium">
-                                    {' '}· 已选择 {selectedIds.length} 条
-                                </span>
-                            )}
-                        </p>
-                    </div>
-
-                    <div className="flex gap-3">
-                        <Button
-                            variant="secondary"
-                            onClick={handleRefresh}
-                            disabled={loading}
-                            icon={<RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />}
-                        >
-                            刷新列表
-                        </Button>
-                        <Button
-                            onClick={() => setShowCreateModal(true)}
-                            icon={<Plus className="w-4 h-4" />}
-                        >
-                            新增
-                        </Button>
-                    </div>
-                </div>
-
-                {/* 搜索面板 */}
+            <div className="space-y-4">
+                {/* 账目筛选 + 新增按钮 */}
                 <SearchPanel
                     onSearch={handleSearch}
-                    onGenerateReport={handleGenerateReport}
+                    onReset={handleReset}
+                    onCreateNew={() => setShowCreateModal(true)}
                     loading={loading}
-                    reportLoading={reportLoading}
                 />
 
-                {/* 操作工具栏 */}
-                <div className="bg-white rounded-xl border border-gray-200 p-4">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                        <span className="text-sm text-gray-500">
-                            {selectedIds.length > 0
-                                ? `已选择 ${selectedIds.length} 条记录`
-                                : '请先勾选要进行操作的账目'
-                            }
-                        </span>
-
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="secondary"
-                                onClick={() => setShowAIConfirm(true)}
-                                disabled={selectedIds.length === 0}
-                                icon={<Sparkles className="w-4 h-4" />}
-                            >
-                                AI仕訳
-                            </Button>
-
-                            <ExportButton
-                                transactions={transactions}
-                                selectedIds={selectedIds}
-                                disabled={selectedIds.length === 0}
-                            />
-
-                            <Button
-                                variant="danger"
-                                onClick={() => setShowDeleteConfirm(true)}
-                                disabled={selectedIds.length === 0}
-                                icon={<Trash2 className="w-4 h-4" />}
-                            >
-                                删除
-                            </Button>
-                        </div>
-                    </div>
+                {/* 结果标题 - 精简版 */}
+                <div className="flex items-center gap-3 flex-wrap">
+                    <h2 className="text-lg font-semibold text-gray-900">{getPageTitle()}</h2>
+                    <span className="text-sm text-gray-500">
+                        共 {transactions.length} 条
+                        {transactions.length > 0 && (
+                            <span className="text-gray-400 ml-2">
+                                *勾选后可批量进行 仕訳 / 导出 / 删除
+                            </span>
+                        )}
+                    </span>
                 </div>
 
                 {/* 数据表格 */}
@@ -468,11 +420,11 @@ export function DashboardPage() {
                     onSelectionChange={setSelectedIds}
                     onEdit={handleEdit}
                     loading={loading}
-                    isSearchResult={isSearchActive}
+                    isSearchResult={titleType === 'search'}
                 />
 
                 {/* 加载更多按钮 */}
-                {!isSearchActive && hasMore && transactions.length > 0 && (
+                {titleType === 'recent' && hasMore && transactions.length > 0 && (
                     <div className="mt-4 flex justify-center">
                         <Button
                             variant="secondary"
@@ -486,13 +438,66 @@ export function DashboardPage() {
                 )}
 
                 {/* 显示当前加载数量 */}
-                {!isSearchActive && transactions.length > 0 && (
+                {titleType === 'recent' && transactions.length > 0 && (
                     <p className="mt-2 text-center text-sm text-gray-400">
                         已加载 {transactions.length} 条账目
                         {!hasMore && '（已全部加载）'}
                     </p>
                 )}
+
+                {/* 底部占位，防止浮动操作栏遮挡内容 */}
+                {selectedIds.length > 0 && <div className="h-20" />}
             </div>
+
+            {/* 底部浮动操作栏 - 选中时显示 */}
+            {selectedIds.length > 0 && (
+                <div className="fixed bottom-0 left-0 right-0 z-50 animate-slide-up">
+                    {/* 移动端底部导航栏安全区域 */}
+                    <div className="bg-white border-t border-gray-200 shadow-lg pb-safe">
+                        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3">
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1 sm:gap-2">
+                                    <span className="text-sm font-medium text-sky-700 bg-sky-100 px-3 py-1 rounded-full whitespace-nowrap">
+                                        已选 {selectedIds.length} 条
+                                    </span>
+                                    <button
+                                        onClick={() => setSelectedIds([])}
+                                        className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100 transition-colors"
+                                        title="取消选择"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center gap-1 sm:gap-2">
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => setShowAIConfirm(true)}
+                                        className="w-24 justify-center"
+                                    >
+                                        AI仕訳
+                                    </Button>
+
+                                    <ExportButton
+                                        transactions={transactions}
+                                        selectedIds={selectedIds}
+                                        dropUp
+                                        className="w-24"
+                                    />
+
+                                    <Button
+                                        variant="danger"
+                                        onClick={() => setShowDeleteConfirm(true)}
+                                        className="w-24 justify-center"
+                                    >
+                                        删除
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* 新增弹窗 */}
             <Modal
@@ -604,28 +609,6 @@ export function DashboardPage() {
                 variant="primary"
                 loading={actionLoading}
             />
-
-            {/* 総勘定元帳结果 */}
-            {ledgerData && (
-                <LedgerResult
-                    isOpen={showLedgerResult}
-                    onClose={() => setShowLedgerResult(false)}
-                    data={ledgerData}
-                    dateFrom={reportDateRange.from}
-                    dateTo={reportDateRange.to}
-                />
-            )}
-
-            {/* 試算表结果 */}
-            {trialBalanceData && (
-                <TrialBalanceResult
-                    isOpen={showTrialBalanceResult}
-                    onClose={() => setShowTrialBalanceResult(false)}
-                    data={trialBalanceData}
-                    dateFrom={reportDateRange.from}
-                    dateTo={reportDateRange.to}
-                />
-            )}
         </Layout>
     );
 }

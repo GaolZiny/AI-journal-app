@@ -458,6 +458,8 @@ export function TransactionForm({
                             type="date"
                             value={formData.transaction_date}
                             onChange={(e) => updateField('transaction_date', e.target.value)}
+                            min="1900-01-01"
+                            max="9999-12-31"
                             style={{ boxSizing: 'border-box', minWidth: 0 }}
                             className={`
                                 w-full max-w-full px-4 py-3 bg-white text-gray-900 border rounded-lg

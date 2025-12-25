@@ -1,5 +1,5 @@
 import { saveAs } from 'file-saver';
-import { ChevronDown, Download, FileText } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, FileText } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import type { Transaction } from '../../types';
@@ -12,9 +12,11 @@ interface ExportButtonProps {
     transactions: Transaction[];
     selectedIds: string[];
     disabled?: boolean;
+    dropUp?: boolean;
+    className?: string;
 }
 
-export function ExportButton({ transactions, selectedIds, disabled = false }: ExportButtonProps) {
+export function ExportButton({ transactions, selectedIds, disabled = false, dropUp = false, className = '' }: ExportButtonProps) {
     const { showToast } = useToast();
     const [showDropdown, setShowDropdown] = useState(false);
     const [showPDFModal, setShowPDFModal] = useState(false);
@@ -131,22 +133,22 @@ export function ExportButton({ transactions, selectedIds, disabled = false }: Ex
 
     return (
         <>
-            <div className="relative" ref={dropdownRef}>
+            <div className={`relative ${className}`} ref={dropdownRef}>
                 <Button
                     variant="secondary"
                     onClick={() => setShowDropdown(!showDropdown)}
                     disabled={disabled}
-                    icon={<Download className="w-4 h-4" />}
+                    className="w-full justify-center"
                 >
                     <span className="inline-flex items-center gap-1">
                         导出
-                        <ChevronDown className="w-3 h-3" />
+                        {dropUp ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                     </span>
                 </Button>
 
                 {showDropdown && (
                     <div
-                        className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50"
+                        className={`absolute right-0 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 ${dropUp ? 'bottom-full mb-1' : 'mt-1'}`}
                         onClick={handleClickOutside}
                     >
                         <button

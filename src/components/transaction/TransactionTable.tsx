@@ -185,6 +185,16 @@ export function TransactionTable({
                                 order={sortOrder}
                                 onClick={() => handleSort('transaction_date')}
                             />
+                            <TableHeader
+                                key="updated_at"
+                                label="更新日"
+                                align="center"
+                                sortable
+                                active={sortField === 'updated_at'}
+                                order={sortOrder}
+                                onClick={() => handleSort('updated_at')}
+                            />
+                            <TableHeader key="status" label="状态" align="center" />
                             <TableHeader key="transaction_type" label="类型" align="center" />
                             <TableHeader key="desc" label="概述" className="min-w-[180px]" />
                             <TableHeader key="fin_type" label="支付方式" align="center" />
@@ -211,16 +221,6 @@ export function TransactionTable({
                             />
                             <TableHeader key="credit_ct" label="貸方税額" align="right" />
                             <TableHeader key="ct_rate" label="税率" align="center" />
-                            <TableHeader
-                                key="updated_at"
-                                label="更新日"
-                                align="center"
-                                sortable
-                                active={sortField === 'updated_at'}
-                                order={sortOrder}
-                                onClick={() => handleSort('updated_at')}
-                            />
-                            <TableHeader key="status" label="状态" align="center" />
                             <th key="actions" className="w-16 px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">
                                 操作
                             </th>
@@ -245,6 +245,17 @@ export function TransactionTable({
                                 </td>
                                 <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
                                     {formatDate(tx.transaction_date)}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-500 text-center whitespace-nowrap">
+                                    {formatDate(tx.updated_at)}
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                    <span className={`
+                                        inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full
+                                        ${STATUS_COLORS[tx.status] || 'bg-gray-100 text-gray-600'}
+                                    `}>
+                                        {STATUS_LABELS[tx.status] || '未知'}
+                                    </span>
                                 </td>
                                 <td className="px-4 py-3 text-sm text-center whitespace-nowrap">
                                     {tx.transaction_type ? (
@@ -284,17 +295,6 @@ export function TransactionTable({
                                 </td>
                                 <td className="px-4 py-3 text-sm text-gray-600 text-center whitespace-nowrap">
                                     {getCtRateLabel(tx.ct_rate)}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-gray-500 text-center whitespace-nowrap">
-                                    {formatDate(tx.updated_at)}
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                    <span className={`
-                                        inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full
-                                        ${STATUS_COLORS[tx.status] || 'bg-gray-100 text-gray-600'}
-                                    `}>
-                                        {STATUS_LABELS[tx.status] || '未知'}
-                                    </span>
                                 </td>
                                 <td className="px-4 py-3 text-center">
                                     <button
