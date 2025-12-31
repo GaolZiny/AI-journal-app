@@ -1,15 +1,17 @@
 import { BarChart3, FileText } from 'lucide-react';
 import { useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/layout/Layout';
+import { JournalResult } from '../components/report/JournalResult';
 import { LedgerResult } from '../components/report/LedgerResult';
+import { MonthlyChartPanel } from '../components/report/MonthlyChartPanel';
 import { TrialBalanceResult } from '../components/report/TrialBalanceResult';
 import { Button } from '../components/ui/Button';
 import { useToast } from '../contexts/ToastContext';
 import { generateSummary } from '../services/api';
-import type { LedgerResponse, SummaryRequest, TrialBalanceResponse } from '../types';
+import type { JournalResponse, LedgerResponse, SummaryRequest, Transaction, TrialBalanceResponse } from '../types';
 
-type ReportType = 'trial_balance' | 'ledger';
+type ReportType = 'trial_balance' | 'ledger' | 'journal' | 'monthly_chart';
 
 export function ReportsPage() {
     const location = useLocation();
@@ -27,7 +29,10 @@ export function ReportsPage() {
     const [loading, setLoading] = useState(false);
     const [trialBalanceData, setTrialBalanceData] = useState<TrialBalanceResponse | null>(null);
     const [ledgerData, setLedgerData] = useState<LedgerResponse | null>(null);
+    const [journalData, setJournalData] = useState<JournalResponse | null>(null);
+    const [monthlyChartData, setMonthlyChartData] = useState<JournalResponse | null>(null);
     const { showToast } = useToast();
+    const navigate = useNavigate();
 
     // 生成报表
     const handleGenerateReport = async () => {
@@ -39,10 +44,20 @@ export function ReportsPage() {
         setLoading(true);
         setTrialBalanceData(null);
         setLedgerData(null);
+        setJournalData(null);
+        setMonthlyChartData(null);
 
         try {
-            // summary_type: 1=総勘定元帳, 2=試算表
-            const summaryType: 1 | 2 = reportType === 'trial_balance' ? 2 : 1;
+            // summary_type: 1=総勘定元帳, 2=試算表, 3=仕訳帳
+            // 月度统计图表使用仕訳帳的数据
+            let summaryType: 1 | 2 | 3;
+            if (reportType === 'trial_balance') {
+                summaryType = 2;
+            } else if (reportType === 'journal' || reportType === 'monthly_chart') {
+                summaryType = 3;
+            } else {
+                summaryType = 1;
+            }
             const params: SummaryRequest = {
                 summary_type: summaryType,
                 date_from: dateFrom,
@@ -55,12 +70,35 @@ export function ReportsPage() {
                 if (reportType === 'trial_balance') {
                     setTrialBalanceData(result.detail as TrialBalanceResponse);
                     showToast('success', '試算表 生成成功');
-                } else {
+                } else if (reportType === 'ledger') {
                     setLedgerData(result.detail as LedgerResponse);
                     showToast('success', '総勘定元帳 生成成功');
+                } else if (reportType === 'journal') {
+                    setJournalData(result.detail as JournalResponse);
+                    showToast('success', '仕訳帳 生成成功');
+                } else if (reportType === 'monthly_chart') {
+                    setMonthlyChartData(result.detail as JournalResponse);
+                    showToast('success', '月度统计图表 生成成功');
                 }
             } else {
-                throw new Error(result.message || '生成失败');
+                // 检查是否是 "Has initialized records" 错误
+                if (result.message?.includes('initialized records') && Array.isArray(result.detail)) {
+                    const uninitializedTransactions = result.detail as Transaction[];
+                    showToast('warning', `日期范围内有 ${uninitializedTransactions.length} 条账目未进行 AI 仕訳，正在跳转...`);
+
+                    // 延迟后跳转到 DashboardPage，带上这些账目数据
+                    setTimeout(() => {
+                        navigate('/transactions', {
+                            state: {
+                                preloadedTransactions: uninitializedTransactions,
+                                filterType: 'uninitialized',
+                                isSearchResult: true
+                            }
+                        });
+                    }, 1000);
+                } else {
+                    throw new Error(result.message || '生成失败');
+                }
             }
         } catch (error) {
             console.error('Report generation error:', error);
@@ -68,6 +106,14 @@ export function ReportsPage() {
         } finally {
             setLoading(false);
         }
+    };
+
+    // 快速设置日期范围
+    const setQuickDateRange = (months: number) => {
+        const now = new Date();
+        const from = new Date(now.getFullYear(), now.getMonth() - months + 1, 1);
+        setDateFrom(from.toISOString().split('T')[0]);
+        setDateTo(now.toISOString().split('T')[0]);
     };
 
     const reportTypes = [
@@ -80,6 +126,16 @@ export function ReportsPage() {
             value: 'ledger' as const,
             label: '総勘定元帳',
             description: '按科目显示所有交易明细'
+        },
+        {
+            value: 'journal' as const,
+            label: '仕訳帳',
+            description: '一般记账本，显示所有交易记录'
+        },
+        {
+            value: 'monthly_chart' as const,
+            label: '月度统计图表',
+            description: '按月汇总收支情况，可视化展示'
         }
     ];
 
@@ -134,6 +190,32 @@ export function ReportsPage() {
                                 日期范围
                             </label>
                             <div className="space-y-4">
+                                {/* 快速选择按钮 */}
+                                {reportType === 'monthly_chart' && (
+                                    <div className="flex flex-wrap gap-2 mb-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setQuickDateRange(3)}
+                                            className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                                        >
+                                            近3个月
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setQuickDateRange(6)}
+                                            className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                                        >
+                                            近6个月
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setQuickDateRange(12)}
+                                            className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                                        >
+                                            近12个月
+                                        </button>
+                                    </div>
+                                )}
                                 <div>
                                     <label className="block text-xs text-gray-500 mb-1">开始日期</label>
                                     <input
@@ -188,6 +270,25 @@ export function ReportsPage() {
                         dateFrom={dateFrom}
                         dateTo={dateTo}
                         onClose={() => setLedgerData(null)}
+                    />
+                )}
+
+                {monthlyChartData && (
+                    <MonthlyChartPanel
+                        data={monthlyChartData}
+                        dateFrom={dateFrom}
+                        dateTo={dateTo}
+                    />
+                )}
+
+                {/* 仕訳帳结果 - 使用弹窗 */}
+                {journalData && (
+                    <JournalResult
+                        isOpen={true}
+                        data={journalData}
+                        dateFrom={dateFrom}
+                        dateTo={dateTo}
+                        onClose={() => setJournalData(null)}
                     />
                 )}
             </div>

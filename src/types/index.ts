@@ -182,7 +182,7 @@ export interface OCRResult {
 export interface SummaryRequest {
     date_from: string;  // YYYY-MM-DD
     date_to: string;    // YYYY-MM-DD
-    summary_type: 1 | 2; // 1=総勘定元帳, 2=試算表
+    summary_type: 1 | 2 | 3; // 1=総勘定元帳, 2=試算表, 3=仕訳帳
 }
 
 // 総勘定元帳 类型
@@ -241,4 +241,24 @@ export interface Toast {
     type: ToastType;
     message: string;
     duration?: number;
+}
+
+// 仕訳帳（Journal）类型
+export interface JournalRecord {
+    id: string;
+    transaction_date: string;  // ISO date string
+    transaction_type: 1 | 2;   // 1=収入, 2=支出
+    description: string;
+    debit_amount: string;      // 借方金額
+    credit_amount: string;     // 貸方金額
+    debit_item: string;        // 借方科目
+    credit_item: string;       // 貸方科目
+    debit_ct: string;          // 借方税額
+    credit_ct: string;         // 貸方税額
+}
+
+export interface JournalResponse {
+    success: boolean;
+    total_count: number;
+    records: JournalRecord[];
 }

@@ -1,4 +1,4 @@
-import { ArrowRight, ChevronRight, Clock, FileText, Plus } from 'lucide-react';
+import { ArrowRight, ChevronRight, Clock, FileText, Plus, TrendingUp } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/layout/Layout';
@@ -485,6 +485,21 @@ export function HomePage() {
                                 <p className="text-sm text-gray-500">按科目查看明细</p>
                             </div>
                             <ArrowRight className="w-5 h-5 text-gray-400 ml-auto group-hover:text-purple-500 transition-colors" />
+                        </Link>
+
+                        <Link
+                            to="/reports"
+                            state={{ reportType: 'monthly_chart' }}
+                            className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-gray-200 hover:border-violet-300 hover:shadow-lg hover:shadow-violet-500/10 transition-all group"
+                        >
+                            <div className="w-12 h-12 bg-violet-100 rounded-xl flex items-center justify-center group-hover:bg-violet-500 transition-colors">
+                                <TrendingUp className="w-6 h-6 text-violet-600 group-hover:text-white transition-colors" />
+                            </div>
+                            <div className="text-left">
+                                <h3 className="font-semibold text-gray-900">月度统计图表</h3>
+                                <p className="text-sm text-gray-500">按月查看收支趋势</p>
+                            </div>
+                            <ArrowRight className="w-5 h-5 text-gray-400 ml-auto group-hover:text-violet-500 transition-colors" />
                         </Link>
                     </div>
                 </section>

@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { Ledger, Transaction, TrialBalanceResponse } from '../types';
+import type { JournalRecord, Ledger, Transaction, TrialBalanceResponse } from '../types';
 
 // 扩展 jsPDF 类型
 declare module 'jspdf' {
@@ -399,6 +399,94 @@ export async function generateLedgerPDF(
             3: { halign: 'right' },
             4: { halign: 'right' },
             5: { halign: 'right' }
+        },
+        didDrawPage: () => {
+            if (!isFirstPage) {
+                doc.setFont('NotoSansJP');
+                addSubsequentPageHeader(doc, config);
+            }
+            isFirstPage = false;
+        },
+        margin: { left: MARGIN, right: MARGIN, top: 40, bottom: 18 }
+    });
+
+    const totalPages = doc.internal.pages.length - 1;
+    for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFont('NotoSansJP');
+        addPageFooter(doc, config, i, totalPages);
+    }
+
+    return doc.output('blob');
+}
+
+// ========================================
+// 仕訳帳 PDF (from JournalRecord[])
+// ========================================
+export async function generateJournalRecordsPDF(
+    records: JournalRecord[],
+    companyName: string,
+    dateFrom: string,
+    dateTo: string
+): Promise<Blob> {
+    const doc = createBasePDF();
+    await registerFont(doc);
+
+    const config: PDFConfig = {
+        title: '仕訳帳',
+        dateRange: `${dateFrom} ~ ${dateTo}`,
+        companyName
+    };
+
+    const headers = [['日付', '備考', '借方科目', '借方金額', '借方税額', '貸方科目', '貸方金額', '貸方税額']];
+
+    const formatRecordAmount = (amount: string | null | undefined): string => {
+        if (!amount) return '';
+        const num = parseFloat(amount);
+        if (isNaN(num) || num === 0) return '';
+        return num.toLocaleString('ja-JP');
+    };
+
+    const body = records.map(r => [
+        r.transaction_date?.split('T')[0] || '',
+        r.description || '',
+        r.debit_item || '',
+        formatRecordAmount(r.debit_amount),
+        formatRecordAmount(r.debit_ct),
+        r.credit_item || '',
+        formatRecordAmount(r.credit_amount),
+        formatRecordAmount(r.credit_ct)
+    ]);
+
+    let isFirstPage = true;
+
+    autoTable(doc, {
+        head: headers,
+        body: body,
+        startY: addFirstPageHeader(doc, config),
+        showHead: 'everyPage',
+        tableWidth: USABLE_WIDTH,
+        styles: {
+            font: 'NotoSansJP',
+            fontSize: 9,
+            cellPadding: 2,
+            overflow: 'linebreak'
+        },
+        headStyles: {
+            fillColor: [66, 139, 202],
+            textColor: 255,
+            fontStyle: 'normal',
+            halign: 'center'
+        },
+        columnStyles: {
+            0: { halign: 'left', cellWidth: 25 },   // 日付
+            1: { halign: 'left', font: 'NotoSansSC', cellWidth: 80 },  // 備考 - 更多空间
+            2: { halign: 'left', cellWidth: 35 },   // 借方科目
+            3: { halign: 'right', cellWidth: 25 },  // 借方金額
+            4: { halign: 'right', cellWidth: 20 },  // 借方税額
+            5: { halign: 'left', cellWidth: 35 },   // 貸方科目
+            6: { halign: 'right', cellWidth: 25 },  // 貸方金額
+            7: { halign: 'right', cellWidth: 20 }   // 貸方税額
         },
         didDrawPage: () => {
             if (!isFirstPage) {

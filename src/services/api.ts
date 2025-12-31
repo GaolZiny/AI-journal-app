@@ -2,6 +2,7 @@ import { config } from '../config';
 import type {
     APIResponse,
     DeleteResult,
+    JournalResponse,
     LedgerResponse,
     OCRResult,
     QueryParams,
@@ -167,11 +168,11 @@ export async function ocrReceipt(
     });
 }
 
-// Generate summary report (総勘定元帳 or 試算表)
+// Generate summary report (総勘定元帳 or 試算表 or 仕訳帳)
 export async function generateSummary(
     params: SummaryRequest
-): Promise<APIResponse<LedgerResponse | TrialBalanceResponse>> {
-    return apiCall<LedgerResponse | TrialBalanceResponse>(WEBHOOKS.DATA_SUMMARY, {
+): Promise<APIResponse<LedgerResponse | TrialBalanceResponse | JournalResponse>> {
+    return apiCall<LedgerResponse | TrialBalanceResponse | JournalResponse>(WEBHOOKS.DATA_SUMMARY, {
         date_from: params.date_from,
         date_to: params.date_to,
         summary_type: params.summary_type
