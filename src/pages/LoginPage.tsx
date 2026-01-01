@@ -13,12 +13,29 @@ export function LoginPage() {
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [rememberMe, setRememberMe] = useState(false);
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
-    // 自动聚焦邮箱输入框
+    // localStorage 键名
+    const REMEMBER_EMAIL_KEY = 'journal_remember_email';
+
+    // 页面加载时：读取已保存的邮箱，并决定聚焦位置
     useEffect(() => {
-        emailInputRef.current?.focus();
+        const savedEmail = localStorage.getItem(REMEMBER_EMAIL_KEY);
+        if (savedEmail) {
+            setEmail(savedEmail);
+            setRememberMe(true);
+            // 如果有保存的邮箱，聚焦到密码框
+            // 使用 setTimeout 确保 DOM 已更新
+            setTimeout(() => {
+                const passwordInput = document.querySelector('input[type="password"]') as HTMLInputElement;
+                passwordInput?.focus();
+            }, 100);
+        } else {
+            // 没有保存的邮箱，聚焦到邮箱输入框
+            emailInputRef.current?.focus();
+        }
     }, []);
 
     const validate = () => {
@@ -49,6 +66,12 @@ export function LoginPage() {
         setLoading(false);
 
         if (result.success) {
+            // 根据"记住我"选项保存或清除邮箱
+            if (rememberMe) {
+                localStorage.setItem(REMEMBER_EMAIL_KEY, email);
+            } else {
+                localStorage.removeItem(REMEMBER_EMAIL_KEY);
+            }
             showToast('success', '登录成功');
             navigate('/');
         } else {
@@ -179,6 +202,8 @@ export function LoginPage() {
                                 <label className="flex items-center gap-2 cursor-pointer">
                                     <input
                                         type="checkbox"
+                                        checked={rememberMe}
+                                        onChange={(e) => setRememberMe(e.target.checked)}
                                         className="w-4 h-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500"
                                     />
                                     <span className="text-sm text-gray-600">记住我</span>

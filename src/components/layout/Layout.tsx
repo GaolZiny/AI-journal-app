@@ -3,13 +3,15 @@ import { Navigation } from './Navigation';
 
 interface LayoutProps {
     children: ReactNode;
+    wide?: boolean;  // 宽布局，用于需要全宽表格的页面
 }
 
-export function Layout({ children }: LayoutProps) {
+export function Layout({ children, wide = false }: LayoutProps) {
     return (
         <div className="min-h-screen bg-gray-50">
             <Navigation />
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-6">
+            <main className={`mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-6 ${wide ? 'max-w-[1600px]' : 'max-w-7xl'
+                }`}>
                 {children}
             </main>
         </div>

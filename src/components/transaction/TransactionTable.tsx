@@ -3,15 +3,6 @@ import { useMemo, useState } from 'react';
 import type { Transaction } from '../../types';
 import { CT_RATE_LABELS, FIN_TYPE_LABELS, STATUS_COLORS, STATUS_LABELS, TRANSACTION_TYPE_LABELS } from '../../types';
 
-// 支付方式的标签颜色
-const FIN_TYPE_COLORS: Record<number, string> = {
-    1: 'bg-slate-100 text-slate-600',      // 现金 - 灰色
-    2: 'bg-blue-100 text-blue-600',        // 银行账户 - 蓝色
-    3: 'bg-violet-100 text-violet-600',    // 电子支付 - 紫色
-    4: 'bg-amber-100 text-amber-600',      // 个人信用卡 - 橙色
-    5: 'bg-orange-100 text-orange-700',    // 公司信用卡 - 深橙色
-};
-
 interface TransactionTableProps {
     transactions: Transaction[];
     selectedIds: string[];
@@ -194,8 +185,8 @@ export function TransactionTable({
                                 order={sortOrder}
                                 onClick={() => handleSort('updated_at')}
                             />
-                            <TableHeader key="status" label="状态" align="center" />
-                            <TableHeader key="transaction_type" label="类型" align="center" />
+                            <TableHeader key="status" label="状态" align="center" className="min-w-[60px]" />
+                            <TableHeader key="transaction_type" label="类型" align="center" className="min-w-[50px]" />
                             <TableHeader key="desc" label="概述" className="min-w-[180px]" />
                             <TableHeader key="fin_type" label="支付方式" align="center" />
                             <TableHeader key="debit_item" label="借方科目" />
@@ -249,9 +240,9 @@ export function TransactionTable({
                                 <td className="px-4 py-3 text-sm text-gray-500 text-center whitespace-nowrap">
                                     {formatDate(tx.updated_at)}
                                 </td>
-                                <td className="px-4 py-3 text-center">
+                                <td className="px-4 py-2 text-center whitespace-nowrap">
                                     <span className={`
-                                        inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full
+                                        inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full whitespace-nowrap
                                         ${STATUS_COLORS[tx.status] || 'bg-gray-100 text-gray-600'}
                                     `}>
                                         {STATUS_LABELS[tx.status] || '未知'}
@@ -320,7 +311,7 @@ export function TransactionTable({
                             type="checkbox"
                             checked={allSelected}
                             onChange={handleSelectAll}
-                            className="w-4 h-4"
+                            className="w-4 h-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500"
                         />
                         <span className="text-sm text-gray-600">
                             {selectedIds.length > 0 ? `已选择 ${selectedIds.length} 项` : '全选'}
@@ -329,11 +320,11 @@ export function TransactionTable({
 
                     {/* 排序下拉 */}
                     <div className="flex items-center gap-2">
-                        <ArrowDownWideNarrow className="w-4 h-4 text-gray-500" />
+                        <ArrowDownWideNarrow className="w-4 h-4 text-gray-400" />
                         <select
                             value={`${sortField}:${sortOrder}`}
                             onChange={handleMobileSortChange}
-                            className="text-sm text-gray-700 bg-white border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
+                            className="text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"
                         >
                             {SORT_OPTIONS.map((option, idx) => (
                                 <option key={idx} value={`${option.field}:${option.order}`}>
@@ -347,105 +338,16 @@ export function TransactionTable({
                 {/* 卡片列表 */}
                 <div className="divide-y divide-gray-100">
                     {sortedTransactions.map((tx, index) => (
-                        <div
+                        <MobileTransactionCard
                             key={tx.id || `card-${index}`}
-                            className={`p-4 transition-colors ${selectedIds.includes(tx.id) ? 'bg-sky-50' : ''
-                                }`}
-                        >
-                            <div className="flex gap-3">
-                                {/* 勾选框 */}
-                                <div className="pt-1">
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedIds.includes(tx.id)}
-                                        onChange={() => handleSelectOne(tx.id)}
-                                        className="w-4 h-4"
-                                    />
-                                </div>
-
-                                {/* 内容区 */}
-                                <div className="flex-1 min-w-0">
-                                    {/* 头部：日期 + 类型 + 支付方式 + 状态 */}
-                                    <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="text-sm text-gray-500">
-                                                {formatDate(tx.transaction_date)}
-                                            </span>
-                                            {tx.transaction_type && (
-                                                <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${tx.transaction_type === 1
-                                                    ? 'bg-emerald-100 text-emerald-700'
-                                                    : 'bg-rose-100 text-rose-700'
-                                                    }`}>
-                                                    {TRANSACTION_TYPE_LABELS[tx.transaction_type]}
-                                                </span>
-                                            )}
-                                            {tx.fin_type && (
-                                                <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${FIN_TYPE_COLORS[tx.fin_type] || 'bg-gray-100 text-gray-600'}`}>
-                                                    {FIN_TYPE_LABELS[tx.fin_type as 1 | 2 | 3 | 4 | 5]}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <span className={`
-                                            inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full
-                                            ${STATUS_COLORS[tx.status] || 'bg-gray-100 text-gray-600'}
-                                        `}>
-                                            {STATUS_LABELS[tx.status] || '未知'}
-                                        </span>
-                                    </div>
-
-                                    {/* 概述 */}
-                                    <p className="text-sm font-medium text-gray-900 mb-3 line-clamp-2">
-                                        {tx.description || '-'}
-                                    </p>
-
-                                    {/* 借方/貸方信息 */}
-                                    <div className="grid grid-cols-2 gap-3 mb-3">
-                                        <div className="bg-gray-50 rounded-lg p-3">
-                                            <p className="text-xs text-gray-500 mb-1">借方</p>
-                                            <p className="text-sm font-medium text-gray-900 truncate">
-                                                {tx.debit_item || '-'}
-                                            </p>
-                                            <p className="text-sm font-semibold text-sky-600 mt-1">
-                                                {formatAmount(tx.debit_amount)}
-                                            </p>
-                                            {tx.debit_ct ? (
-                                                <p className="text-xs text-gray-500 mt-0.5">
-                                                    税額: {formatAmount(tx.debit_ct)}
-                                                </p>
-                                            ) : null}
-                                        </div>
-                                        <div className="bg-gray-50 rounded-lg p-3">
-                                            <p className="text-xs text-gray-500 mb-1">貸方</p>
-                                            <p className="text-sm font-medium text-gray-900 truncate">
-                                                {tx.credit_item || '-'}
-                                            </p>
-                                            <p className="text-sm font-semibold text-emerald-600 mt-1">
-                                                {formatAmount(tx.credit_amount)}
-                                            </p>
-                                            {tx.credit_ct ? (
-                                                <p className="text-xs text-gray-500 mt-0.5">
-                                                    税額: {formatAmount(tx.credit_ct)}
-                                                </p>
-                                            ) : null}
-                                        </div>
-                                    </div>
-
-                                    {/* 底部：税率 + 更新日期 + 编辑按钮 */}
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs text-gray-400">
-                                            税率: {getCtRateLabel(tx.ct_rate)} | 更新: {formatDate(tx.updated_at)}
-                                        </span>
-                                        <button
-                                            onClick={() => onEdit(tx)}
-                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-lg transition-colors"
-                                        >
-                                            <Edit3 className="w-3.5 h-3.5" />
-                                            编辑
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                            transaction={tx}
+                            isSelected={selectedIds.includes(tx.id)}
+                            onSelect={() => handleSelectOne(tx.id)}
+                            onEdit={() => onEdit(tx)}
+                            formatDate={formatDate}
+                            formatAmount={formatAmount}
+                            getCtRateLabel={getCtRateLabel}
+                        />
                     ))}
                 </div>
             </div>
@@ -501,5 +403,127 @@ function TableHeader({
                 )}
             </div>
         </th>
+    );
+}
+
+// 移动端卡片组件 - 可折叠详情
+interface MobileTransactionCardProps {
+    transaction: Transaction;
+    isSelected: boolean;
+    onSelect: () => void;
+    onEdit: () => void;
+    formatDate: (date: string | undefined | null) => string;
+    formatAmount: (amount: number | undefined | null) => string;
+    getCtRateLabel: (rate: number | undefined | null) => string;
+}
+
+function MobileTransactionCard({
+    transaction: tx,
+    isSelected,
+    onSelect,
+    onEdit,
+    formatDate,
+    formatAmount,
+    getCtRateLabel
+}: MobileTransactionCardProps) {
+    const [expanded, setExpanded] = useState(false);
+
+    // 计算总金额显示
+    const totalAmount = Math.max(tx.debit_amount || 0, tx.credit_amount || 0);
+    const isIncome = tx.transaction_type === 1;
+
+    return (
+        <div className={`p-4 transition-colors ${isSelected ? 'bg-sky-50' : ''}`}>
+            <div className="flex gap-3">
+                {/* 勾选框 */}
+                <div className="pt-0.5">
+                    <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={onSelect}
+                        className="w-4 h-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500"
+                    />
+                </div>
+
+                {/* 内容区 */}
+                <div className="flex-1 min-w-0">
+                    {/* 第一行：状态 + 日期 + 金额 */}
+                    <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                            <span className={`
+                                inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full
+                                ${STATUS_COLORS[tx.status] || 'bg-gray-100 text-gray-600'}
+                            `}>
+                                {STATUS_LABELS[tx.status] || '未知'}
+                            </span>
+                            <span className="text-sm text-gray-500">
+                                {formatDate(tx.transaction_date)}
+                            </span>
+                        </div>
+                        <span className={`text-base font-bold ${isIncome ? 'text-emerald-600' : 'text-gray-900'}`}>
+                            {isIncome ? '+' : ''}{formatAmount(totalAmount)}
+                        </span>
+                    </div>
+
+                    {/* 第二行：描述 */}
+                    <p className="text-sm font-medium text-gray-900 mb-2 line-clamp-1">
+                        {tx.description || '-'}
+                    </p>
+
+                    {/* 折叠切换 + 操作按钮 */}
+                    <div className="flex items-center justify-between">
+                        <button
+                            onClick={() => setExpanded(!expanded)}
+                            className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+                        >
+                            {expanded ? (
+                                <>
+                                    <ChevronUp className="w-3.5 h-3.5" />
+                                    收起详情
+                                </>
+                            ) : (
+                                <>
+                                    <ChevronDown className="w-3.5 h-3.5" />
+                                    展开详情
+                                </>
+                            )}
+                        </button>
+                        <div className="flex items-center gap-3">
+                            <span className="text-xs text-gray-400">
+                                {formatDate(tx.updated_at)}
+                            </span>
+                            <button
+                                onClick={onEdit}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
+                            >
+                                <Edit3 className="w-3 h-3" />
+                                编辑
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* 展开的详情区域 - 更紧凑的布局 */}
+                    {expanded && (
+                        <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5 animate-fade-in text-sm">
+                            {/* 借方行 */}
+                            <div className="flex items-center justify-between">
+                                <span className="text-gray-500">借方：{tx.debit_item || '-'}</span>
+                                <span className="text-sky-600 font-medium">{formatAmount(tx.debit_amount)}</span>
+                            </div>
+                            {/* 貸方行 */}
+                            <div className="flex items-center justify-between">
+                                <span className="text-gray-500">貸方：{tx.credit_item || '-'}</span>
+                                <span className="text-emerald-600 font-medium">{formatAmount(tx.credit_amount)}</span>
+                            </div>
+                            {/* 税区分 + 支付方式 */}
+                            <div className="flex items-center justify-between">
+                                <span className="text-gray-500">税区分：{getCtRateLabel(tx.ct_rate)}</span>
+                                <span className="text-gray-700">{tx.fin_type ? FIN_TYPE_LABELS[tx.fin_type as 1 | 2 | 3 | 4 | 5] : '-'}</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
     );
 }

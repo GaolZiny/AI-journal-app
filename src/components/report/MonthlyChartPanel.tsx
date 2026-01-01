@@ -1,4 +1,4 @@
-import { TrendingUp } from 'lucide-react';
+import { BarChart3, TrendingUp } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import {
     Bar,
@@ -14,7 +14,6 @@ import {
     YAxis
 } from 'recharts';
 import type { JournalResponse } from '../../types';
-import { Button } from '../ui/Button';
 
 interface MonthlyChartPanelProps {
     data: JournalResponse;
@@ -150,7 +149,7 @@ function CustomTooltip({ active, payload, label, accounts }: CustomTooltipProps)
             {/* 净额 */}
             {incomeItems.length > 0 && expenseItems.length > 0 && (
                 <div className="flex justify-between items-center pt-2 mt-2 border-t border-gray-200 text-sm font-semibold">
-                    <span className="text-gray-700">純額</span>
+                    <span className="text-gray-700">総額</span>
                     <span className={totalIncome - totalExpense >= 0 ? 'text-emerald-600' : 'text-orange-600'}>
                         {totalIncome - totalExpense >= 0 ? '+' : ''}{formatAmount(totalIncome - totalExpense)}
                     </span>
@@ -335,35 +334,41 @@ export function MonthlyChartPanel({ data, dateFrom, dateTo }: MonthlyChartPanelP
     return (
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
             {/* 标题栏 */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-violet-50 to-white">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center">
-                        <TrendingUp className="w-5 h-5 text-violet-600" />
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 bg-gradient-to-r from-violet-50 to-white">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-violet-100 rounded-xl flex items-center justify-center shrink-0">
+                        <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-violet-600" />
                     </div>
-                    <div>
-                        <h2 className="text-lg font-semibold text-gray-900">月度统计图表</h2>
-                        <p className="text-sm text-gray-500">
+                    <div className="min-w-0">
+                        <h2 className="text-base sm:text-lg font-semibold text-gray-900">月度统计图表</h2>
+                        <p className="text-xs sm:text-sm text-gray-500 truncate">
                             {dateFrom} ~ {dateTo}
                         </p>
                     </div>
                 </div>
 
-                {/* 图表模式切换 */}
-                <div className="flex items-center gap-2">
-                    <Button
-                        variant={chartMode === 'bar' ? 'primary' : 'secondary'}
-                        size="sm"
+                {/* 图表模式切换 - 使用图标 */}
+                <div className="flex items-center gap-1 shrink-0">
+                    <button
                         onClick={() => setChartMode('bar')}
+                        className={`p-2 rounded-lg transition-all ${chartMode === 'bar'
+                            ? 'bg-sky-500 text-white shadow-sm'
+                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                            }`}
+                        title="柱状图"
                     >
-                        柱状图
-                    </Button>
-                    <Button
-                        variant={chartMode === 'line' ? 'primary' : 'secondary'}
-                        size="sm"
+                        <BarChart3 className="w-5 h-5" />
+                    </button>
+                    <button
                         onClick={() => setChartMode('line')}
+                        className={`p-2 rounded-lg transition-all ${chartMode === 'line'
+                            ? 'bg-sky-500 text-white shadow-sm'
+                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                            }`}
+                        title="折线图"
                     >
-                        折线图
-                    </Button>
+                        <TrendingUp className="w-5 h-5" />
+                    </button>
                 </div>
             </div>
 
@@ -393,14 +398,14 @@ export function MonthlyChartPanel({ data, dateFrom, dateTo }: MonthlyChartPanelP
             )}
 
             {/* 图表区域 */}
-            <div className="p-6">
+            <div className="p-2 sm:p-6 overflow-x-auto">
                 {chartMode === 'bar' ? (
-                    <div style={{ width: '100%', height: 450 }}>
-                        <ResponsiveContainer width="100%" height={450} minWidth={300}>
+                    <div style={{ width: '100%', minWidth: '320px', height: 400 }}>
+                        <ResponsiveContainer width="100%" height={400}>
                             <BarChart
                                 data={monthlyData}
                                 stackOffset="sign"
-                                margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                                margin={{ top: 10, right: 10, left: 0, bottom: 40 }}
                             >
                                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                                 <XAxis
@@ -421,14 +426,8 @@ export function MonthlyChartPanel({ data, dateFrom, dateTo }: MonthlyChartPanelP
                                     content={<CustomTooltip accounts={accounts} />}
                                     cursor={{ fill: 'rgba(0,0,0,0.05)' }}
                                 />
-                                <Legend
-                                    wrapperStyle={{ paddingTop: '20px' }}
-                                    iconType="square"
-                                    iconSize={12}
-                                    formatter={(value) => (
-                                        <span className="text-xs text-gray-600 ml-1">{value}</span>
-                                    )}
-                                />
+                                {/* 隐藏默认图例，使用底部自定义图例 */}
+                                <Legend content={() => null} />
                                 <ReferenceLine y={0} stroke="#9ca3af" strokeWidth={1.5} />
 
                                 {/* 收入科目（正值，上方） */}
@@ -518,15 +517,15 @@ export function MonthlyChartPanel({ data, dateFrom, dateTo }: MonthlyChartPanelP
             </div>
 
             {/* 底部图例说明 */}
-            <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100">
-                <div className="flex flex-wrap items-center gap-6">
-                    <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded-sm bg-gradient-to-r from-emerald-400 to-cyan-400"></div>
-                        <span className="text-sm text-gray-600">収入科目（上方・正金額）</span>
+            <div className="px-4 sm:px-6 py-3 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100">
+                <div className="flex items-center justify-center gap-4 sm:gap-6">
+                    <div className="flex items-center gap-1.5">
+                        <div className="w-3 h-3 rounded-sm bg-gradient-to-r from-emerald-400 to-cyan-400"></div>
+                        <span className="text-xs sm:text-sm text-gray-600">収入（上方）</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded-sm bg-gradient-to-r from-orange-400 to-rose-400"></div>
-                        <span className="text-sm text-gray-600">支出科目（下方・負金額）</span>
+                    <div className="flex items-center gap-1.5">
+                        <div className="w-3 h-3 rounded-sm bg-gradient-to-r from-orange-400 to-rose-400"></div>
+                        <span className="text-xs sm:text-sm text-gray-600">支出（下方）</span>
                     </div>
                 </div>
             </div>

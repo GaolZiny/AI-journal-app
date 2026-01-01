@@ -1,5 +1,15 @@
-import { ArrowRight, ChevronRight, Clock, FileText, Plus, TrendingUp } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import {
+    ArrowDownRight,
+    ArrowRight,
+    ArrowUpRight,
+    BarChart3,
+    Bot,
+    ChevronRight,
+    FileText,
+    Plus,
+    TrendingUp
+} from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/layout/Layout';
 import { Loading } from '../components/ui/Loading';
@@ -10,6 +20,7 @@ import type { Transaction } from '../types';
 // 共享的缓存配置（与 DashboardPage 一致）
 const CACHE_KEY_PREFIX = 'journal_transactions_';
 const CACHE_KEY_UNINITIALIZED_PREFIX = 'journal_uninitialized_';
+const CACHE_KEY_MONTHLY_PREFIX = 'journal_monthly_';
 const CACHE_EXPIRY = 5 * 60 * 1000; // 5分钟
 
 interface CachedData {
@@ -17,19 +28,19 @@ interface CachedData {
     timestamp: number;
 }
 
-// 状态标签映射
+// 状态标签映射（与账目管理页面对齐）
 const STATUS_CONFIG = {
     initialized: {
-        label: 'AI未処理',
-        className: 'bg-gray-100 text-gray-600'
+        label: '未仕訳',
+        className: 'bg-amber-100 text-amber-700'
     },
     journaled: {
-        label: 'AI已処理',
-        className: 'bg-green-100 text-green-600'
+        label: '已仕訳',
+        className: 'bg-emerald-100 text-emerald-700'
     },
     updated: {
-        label: '手动修改',
-        className: 'bg-amber-100 text-amber-600'
+        label: '修改',
+        className: 'bg-violet-100 text-violet-700'
     }
 } as const;
 
@@ -53,10 +64,12 @@ export function HomePage() {
     // 用户专属的缓存键
     const recentCacheKey = user?.uid ? `${CACHE_KEY_PREFIX}${user.uid}` : null;
     const uninitializedCacheKey = user?.uid ? `${CACHE_KEY_UNINITIALIZED_PREFIX}${user.uid}` : null;
+    const monthlyCacheKey = user?.uid ? `${CACHE_KEY_MONTHLY_PREFIX}${user.uid}` : null;
 
     // 数据状态
     const [uninitializedTransactions, setUninitializedTransactions] = useState<Transaction[]>([]);
     const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
+    const [monthlyTransactions, setMonthlyTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
 
     /**
@@ -97,13 +110,9 @@ export function HomePage() {
      * 获取所有未进行仕訳的账目 (status = initialized)
      */
     const fetchUninitializedTransactions = useCallback(async (): Promise<Transaction[]> => {
-        // 先检查缓存
         const cached = readFromCache(uninitializedCacheKey);
-        if (cached) {
-            return cached;
-        }
+        if (cached) return cached;
 
-        // 缓存无效，调用 API
         try {
             const result = await queryTransactions({
                 status_list: ['initialized'],
@@ -113,7 +122,6 @@ export function HomePage() {
             if (result.status === 'successed' && result.detail) {
                 const rawList = Array.isArray(result.detail) ? result.detail : [];
                 const validList = rawList.filter(isValidTransaction);
-                // 保存到缓存
                 saveToCache(uninitializedCacheKey, validList);
                 return validList;
             }
@@ -127,13 +135,9 @@ export function HomePage() {
      * 获取最近更新的账目（所有状态，按 updated_at 排序，20条）
      */
     const fetchRecentTransactions = useCallback(async (): Promise<Transaction[]> => {
-        // 先检查缓存
         const cached = readFromCache(recentCacheKey);
-        if (cached) {
-            return cached;
-        }
+        if (cached) return cached;
 
-        // 缓存无效，调用 API
         try {
             const result = await queryTransactions({
                 status_list: ['initialized', 'journaled', 'updated'],
@@ -144,7 +148,6 @@ export function HomePage() {
             if (result.status === 'successed' && result.detail) {
                 const rawList = Array.isArray(result.detail) ? result.detail : [];
                 const validList = rawList.filter(isValidTransaction);
-                // 保存到缓存
                 saveToCache(recentCacheKey, validList);
                 return validList;
             }
@@ -155,21 +158,58 @@ export function HomePage() {
     }, [recentCacheKey, readFromCache, saveToCache]);
 
     /**
-     * 检测是否是浏览器刷新（而非 SPA 内导航）
-     * 结合 performance.now() 来判断 - 只有页面刚加载（2秒内）时才认为是刷新
+     * 获取本月账目数据（用于计算收入/支出）- 带缓存
+     */
+    const fetchMonthlyTransactions = useCallback(async (): Promise<Transaction[]> => {
+        // 先尝试从缓存读取
+        const cached = readFromCache(monthlyCacheKey);
+        if (cached) {
+            return cached;
+        }
+
+        try {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth() + 1;
+
+            // 当月第一天
+            const dateFrom = `${year}-${String(month).padStart(2, '0')}-01`;
+
+            // 当月最后一天
+            const lastDay = new Date(year, month, 0).getDate();
+            const dateTo = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+            const result = await queryTransactions({
+                status_list: ['initialized', 'journaled', 'updated'],
+                date_from: dateFrom,
+                date_to: dateTo,
+                sort_by: 'transaction_date',
+                sort_order: 'desc'
+            });
+
+            if (result.status === 'successed' && result.detail) {
+                const rawList = Array.isArray(result.detail) ? result.detail : [];
+                const validList = rawList.filter(isValidTransaction);
+                // 保存到缓存
+                saveToCache(monthlyCacheKey, validList);
+                return validList;
+            }
+        } catch (error) {
+            console.error('Failed to fetch monthly transactions:', error);
+        }
+        return [];
+    }, [monthlyCacheKey, readFromCache, saveToCache]);
+
+    /**
+     * 检测是否是浏览器刷新
      */
     const isPageReload = useCallback((): boolean => {
         try {
-            // 如果页面已经加载超过2秒，说明是 SPA 内导航，不是刷新
-            if (performance.now() > 2000) {
-                return false;
-            }
+            if (performance.now() > 2000) return false;
             const entries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
-            if (entries.length > 0 && entries[0].type === 'reload') {
-                return true;
-            }
+            if (entries.length > 0 && entries[0].type === 'reload') return true;
         } catch {
-            // Fallback: ignore if API not supported
+            // Fallback
         }
         return false;
     }, []);
@@ -178,102 +218,89 @@ export function HomePage() {
      * 清除所有首页相关缓存
      */
     const clearAllHomeCache = useCallback(() => {
-        if (uninitializedCacheKey) {
-            try {
-                localStorage.removeItem(uninitializedCacheKey);
-            } catch {
-                // Ignore
+        [uninitializedCacheKey, recentCacheKey, monthlyCacheKey].forEach(key => {
+            if (key) {
+                try { localStorage.removeItem(key); } catch { /* Ignore */ }
             }
-        }
-        if (recentCacheKey) {
-            try {
-                localStorage.removeItem(recentCacheKey);
-            } catch {
-                // Ignore
-            }
-        }
-    }, [uninitializedCacheKey, recentCacheKey]);
+        });
+    }, [uninitializedCacheKey, recentCacheKey, monthlyCacheKey]);
 
     // 初始加载
     useEffect(() => {
         const loadData = async () => {
-            // 如果是浏览器刷新，先清除缓存，强制获取最新数据
-            if (isPageReload()) {
-                clearAllHomeCache();
-            }
-
+            if (isPageReload()) clearAllHomeCache();
             setLoading(true);
-            const [uninitialized, recent] = await Promise.all([
+            const [uninitialized, recent, monthly] = await Promise.all([
                 fetchUninitializedTransactions(),
-                fetchRecentTransactions()
+                fetchRecentTransactions(),
+                fetchMonthlyTransactions()
             ]);
             setUninitializedTransactions(uninitialized);
             setRecentTransactions(recent);
+            setMonthlyTransactions(monthly);
             setLoading(false);
         };
         loadData();
-    }, [fetchUninitializedTransactions, fetchRecentTransactions, isPageReload, clearAllHomeCache]);
+    }, [fetchUninitializedTransactions, fetchRecentTransactions, fetchMonthlyTransactions, isPageReload, clearAllHomeCache]);
 
-    // 首页显示的数据
-    const displayedUninitializedTransactions = uninitializedTransactions.slice(0, 3);
+    // 计算本月收入/支出
+    const monthlyStats = useMemo(() => {
+        let totalIncome = 0;
+        let totalExpense = 0;
+
+        monthlyTransactions.forEach(tx => {
+            const txType = tx.transaction_type || tx.amount_type;
+            const isIncome = txType === 1;
+
+            if (isIncome) {
+                // 收入：使用 debit_amount 或 amount_total（确保转为数字）
+                const rawAmount = tx.debit_amount || tx.amount_total || 0;
+                const amount = typeof rawAmount === 'string' ? parseFloat(rawAmount) : rawAmount;
+                totalIncome += amount || 0;
+            } else {
+                // 支出：使用 credit_amount 或 amount_total（确保转为数字）
+                const rawAmount = tx.credit_amount || tx.amount_total || 0;
+                const amount = typeof rawAmount === 'string' ? parseFloat(rawAmount) : rawAmount;
+                totalExpense += amount || 0;
+            }
+        });
+
+        // 计算 AI 仕訳进度
+        const totalCount = recentTransactions.length;
+        const processedCount = recentTransactions.filter(tx =>
+            tx.status === 'journaled' || tx.status === 'updated'
+        ).length;
+        const progressPercent = totalCount > 0 ? Math.round((processedCount / totalCount) * 100) : 0;
+
+        return {
+            income: totalIncome,
+            expense: totalExpense,
+            processedCount,
+            totalCount,
+            progressPercent
+        };
+    }, [monthlyTransactions, recentTransactions]);
+
+    // 显示数据
     const uninitializedCount = uninitializedTransactions.length;
-    const displayedRecentTransactions = recentTransactions.slice(0, 3);
+    const displayedRecentTransactions = recentTransactions.slice(0, 5);
 
-    // 格式化金额
+    // 格式化金额（不使用“万”，统一显示完整数字）
     const formatAmount = (amount: number | null | undefined): string => {
-        if (amount === null || amount === undefined || amount === 0) return '¥0';
+        if (amount === null || amount === undefined || isNaN(amount) || amount === 0) return '¥0';
         return `¥${Math.abs(amount).toLocaleString('ja-JP')}`;
     };
 
-    /**
-     * 获取交易金额显示
-     */
-    const getAmountDisplay = (tx: Transaction): { amount: string; isIncome: boolean } => {
-        const txType = tx.transaction_type || tx.amount_type;
-        const isIncome = txType === 1;
-
-        let amountValue: number | undefined;
-        if (isIncome) {
-            amountValue = tx.debit_amount;
-        } else {
-            amountValue = tx.credit_amount;
-        }
-
-        if (!amountValue || amountValue === 0) {
-            amountValue = tx.amount_total;
-        }
-
-        return {
-            amount: formatAmount(amountValue),
-            isIncome: isIncome
-        };
-    };
-
-    // 格式化日期
+    // 格式化日期 (格式: 2025/12/19)
     const formatDate = (dateStr: string | undefined): string => {
         if (!dateStr) return '-';
         try {
             const date = new Date(dateStr);
             if (isNaN(date.getTime())) return '-';
-            return date.toLocaleDateString('zh-CN');
-        } catch {
-            return '-';
-        }
-    };
-
-    // 格式化日期时间
-    const formatDateTime = (dateStr: string | undefined): string => {
-        if (!dateStr) return '-';
-        try {
-            const date = new Date(dateStr);
-            if (isNaN(date.getTime())) return '-';
-            return date.toLocaleString('zh-CN', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}/${month}/${day}`;
         } catch {
             return '-';
         }
@@ -284,14 +311,21 @@ export function HomePage() {
         return STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.initialized;
     };
 
-    // 获取科目显示名称
+    // 获取交易金额显示
+    const getAmountDisplay = (tx: Transaction): { amount: number; isIncome: boolean } => {
+        const txType = tx.transaction_type || tx.amount_type;
+        const isIncome = txType === 1;
+        let amountValue = isIncome ? tx.debit_amount : tx.credit_amount;
+        if (!amountValue || amountValue === 0) amountValue = tx.amount_total || 0;
+        return { amount: amountValue, isIncome };
+    };
+
+    // 获取科目名称
     const getAccountName = (tx: Transaction): string => {
         return tx.debit_item || tx.credit_item || '未分类';
     };
 
-    /**
-     * 查看全部未进行仕訳账目
-     */
+    // 导航函数
     const handleViewAllUninitialized = () => {
         navigate('/transactions', {
             state: {
@@ -302,12 +336,7 @@ export function HomePage() {
         });
     };
 
-    /**
-     * 查看更多最近更新的账目
-     */
-    const handleViewMoreRecent = () => {
-        navigate('/transactions');
-    };
+    const handleViewMoreRecent = () => navigate('/transactions');
 
     if (loading) {
         return (
@@ -317,192 +346,217 @@ export function HomePage() {
         );
     }
 
+    // 获取当前月份显示
+    const currentMonthLabel = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' });
+
     return (
         <Layout>
             <div className="space-y-6">
-                {/* 未进行仕訳账目区域 */}
-                <section className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
-                                <Clock className="w-5 h-5 text-amber-600" />
-                            </div>
-                            <div>
-                                <h2 className="text-lg font-semibold text-gray-900">未进行仕訳账目</h2>
-                                <p className="text-sm text-gray-500">
-                                    {uninitializedCount > 0
-                                        ? `共 ${uninitializedCount} 笔账目待处理`
-                                        : '暂无待处理账目'}
-                                </p>
-                            </div>
-                        </div>
-                        {uninitializedCount > 0 && (
-                            <button
-                                onClick={handleViewAllUninitialized}
-                                className="flex items-center gap-1 text-sm text-sky-600 hover:text-sky-700 font-medium"
-                            >
-                                查看全部
-                                <ChevronRight className="w-4 h-4" />
-                            </button>
-                        )}
-                    </div>
+                {/* ===== 本月概览 + 右侧卡片 ===== */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-                    {displayedUninitializedTransactions.length > 0 ? (
-                        <div className="divide-y divide-gray-100">
-                            {displayedUninitializedTransactions.map((tx) => {
-                                const { amount, isIncome } = getAmountDisplay(tx);
-                                return (
-                                    <div
-                                        key={tx.id}
-                                        onClick={handleViewAllUninitialized}
-                                        className="flex items-center px-6 py-4 hover:bg-gray-50 transition-colors cursor-pointer"
-                                    >
-                                        <div className="flex items-center gap-4 flex-1 min-w-0">
-                                            <span className="text-sm text-gray-500 w-24 shrink-0">
-                                                {formatDate(tx.transaction_date)}
-                                            </span>
-                                            <span className={`text-sm font-semibold w-28 shrink-0 ${isIncome ? 'text-green-600' : 'text-red-600'}`}>
-                                                {isIncome ? '+' : '-'}{amount}
-                                            </span>
-                                            <span className="text-sm text-gray-700 truncate flex-1">
-                                                {tx.description || '无描述'}
-                                            </span>
-                                        </div>
-                                        <ArrowRight className="w-4 h-4 text-gray-400" />
+                    {/* 左侧：本月概览 + AI仕訳助手 + 近期编辑账目 */}
+                    <div className="lg:col-span-2 space-y-6">
+                        {/* 本月概览 */}
+                        <div className="bg-gradient-to-br from-blue-600 via-blue-500 to-cyan-400 rounded-2xl p-5 text-white shadow-xl shadow-blue-500/20">
+                            {/* 标题区域 */}
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                    <p className="text-blue-100 text-sm">你好，{user?.displayName || user?.email?.split('@')[0] || '用户'}</p>
+                                    <h2 className="text-xl font-bold mt-0.5">{currentMonthLabel}概览</h2>
+                                </div>
+                                <div className="w-10 h-10 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
+                                    <BarChart3 className="w-5 h-5" />
+                                </div>
+                            </div>
+
+                            {/* 收入/支出 两栏 */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-white/10 backdrop-blur rounded-xl p-4">
+                                    <div className="flex items-center gap-2 text-blue-100 text-sm mb-1">
+                                        <ArrowUpRight className="w-4 h-4" />
+                                        <span>收入</span>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    ) : (
-                        <div className="px-6 py-4 text-center">
-                            <p className="text-sm text-gray-500">当前没有未进行仕訳的账目</p>
-                        </div>
-                    )}
-                </section>
-
-                {/* 最近更新区域 */}
-                <section className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-sky-100 rounded-xl flex items-center justify-center">
-                                <FileText className="w-5 h-5 text-sky-600" />
-                            </div>
-                            <h2 className="text-lg font-semibold text-gray-900">最近更新</h2>
-                        </div>
-                        {recentTransactions.length > 3 && (
-                            <button
-                                onClick={handleViewMoreRecent}
-                                className="flex items-center gap-1 text-sm text-sky-600 hover:text-sky-700 font-medium"
-                            >
-                                查看更多
-                                <ChevronRight className="w-4 h-4" />
-                            </button>
-                        )}
-                    </div>
-
-                    {displayedRecentTransactions.length > 0 ? (
-                        <div className="divide-y divide-gray-100">
-                            {displayedRecentTransactions.map((tx) => {
-                                const statusConfig = getStatusConfig(tx.status);
-                                const { amount, isIncome } = getAmountDisplay(tx);
-                                return (
-                                    <div
-                                        key={tx.id}
-                                        onClick={handleViewMoreRecent}
-                                        className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors cursor-pointer"
-                                    >
-                                        <div className="flex items-center gap-4 flex-1 min-w-0">
-                                            <span className="text-sm text-gray-500 w-36 shrink-0">
-                                                {formatDateTime(tx.updated_at)}
-                                            </span>
-                                            <span className="text-sm font-medium text-gray-900 w-20 shrink-0 truncate">
-                                                {getAccountName(tx)}
-                                            </span>
-                                            <span className="text-sm text-gray-600 truncate flex-1">
-                                                {tx.description || '无描述'}
-                                            </span>
-                                            <span className={`text-sm font-semibold shrink-0 ${isIncome ? 'text-green-600' : 'text-red-600'}`}>
-                                                {isIncome ? '+' : '-'}{amount}
-                                            </span>
-                                        </div>
-                                        <span className={`ml-3 px-2.5 py-1 text-xs font-medium rounded-full shrink-0 ${statusConfig.className}`}>
-                                            {statusConfig.label}
-                                        </span>
+                                    <p className="text-2xl font-bold">{formatAmount(monthlyStats.income)}</p>
+                                </div>
+                                <div className="bg-white/10 backdrop-blur rounded-xl p-4">
+                                    <div className="flex items-center gap-2 text-blue-100 text-sm mb-1">
+                                        <ArrowDownRight className="w-4 h-4" />
+                                        <span>支出</span>
                                     </div>
-                                );
-                            })}
+                                    <p className="text-2xl font-bold">{formatAmount(monthlyStats.expense)}</p>
+                                </div>
+                            </div>
                         </div>
-                    ) : (
-                        <div className="px-6 py-12 text-center">
-                            <p className="text-gray-500">暂无账目记录</p>
+
+                        {/* AI仕訳助手卡片 */}
+                        <div
+                            onClick={handleViewAllUninitialized}
+                            className="bg-gradient-to-br from-emerald-500 to-teal-400 rounded-2xl p-5 text-white cursor-pointer hover:shadow-lg hover:shadow-emerald-500/20 transition-all"
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center shrink-0">
+                                    <Bot className="w-6 h-6" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="font-semibold">AI 仕訳助手</h3>
+                                    {uninitializedCount > 0 ? (
+                                        <p className="text-emerald-100 text-sm mt-1">
+                                            有 {uninitializedCount} 条需要进行 AI 仕訳
+                                        </p>
+                                    ) : (
+                                        <p className="text-emerald-100 text-sm mt-1">
+                                            所有仕訳已处理完成 ✓
+                                        </p>
+                                    )}
+                                </div>
+                                {uninitializedCount > 0 && (
+                                    <button className="px-4 py-1.5 bg-white text-emerald-600 text-sm font-medium rounded-lg hover:bg-emerald-50 transition-colors shrink-0">
+                                        立即处理
+                                    </button>
+                                )}
+                            </div>
                         </div>
-                    )}
-                </section>
 
-                {/* 快捷操作区域 */}
-                <section>
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">快捷操作</h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <button
-                            onClick={() => navigate('/transactions', { state: { openCreate: true } })}
-                            className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-gray-200 hover:border-sky-300 hover:shadow-lg hover:shadow-sky-500/10 transition-all group"
-                        >
-                            <div className="w-12 h-12 bg-sky-100 rounded-xl flex items-center justify-center group-hover:bg-sky-500 transition-colors">
-                                <Plus className="w-6 h-6 text-sky-600 group-hover:text-white transition-colors" />
+                        {/* 近期编辑账目 */}
+                        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                                <h2 className="text-lg font-semibold text-gray-900">近期编辑账目</h2>
+                                <button
+                                    onClick={handleViewMoreRecent}
+                                    className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                                >
+                                    查看全部
+                                    <ChevronRight className="w-4 h-4" />
+                                </button>
                             </div>
-                            <div className="text-left">
-                                <h3 className="font-semibold text-gray-900">新增账目</h3>
-                                <p className="text-sm text-gray-500">手动录入或AI识图</p>
-                            </div>
-                            <ArrowRight className="w-5 h-5 text-gray-400 ml-auto group-hover:text-sky-500 transition-colors" />
-                        </button>
 
-                        <Link
-                            to="/reports"
-                            state={{ reportType: 'trial_balance' }}
-                            className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-gray-200 hover:border-indigo-300 hover:shadow-lg hover:shadow-indigo-500/10 transition-all group"
-                        >
-                            <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center group-hover:bg-indigo-500 transition-colors">
-                                <FileText className="w-6 h-6 text-indigo-600 group-hover:text-white transition-colors" />
-                            </div>
-                            <div className="text-left">
-                                <h3 className="font-semibold text-gray-900">生成試算表</h3>
-                                <p className="text-sm text-gray-500">查看财务汇总</p>
-                            </div>
-                            <ArrowRight className="w-5 h-5 text-gray-400 ml-auto group-hover:text-indigo-500 transition-colors" />
-                        </Link>
+                            {displayedRecentTransactions.length > 0 ? (
+                                <div className="divide-y divide-gray-100">
+                                    {displayedRecentTransactions.map((tx) => {
+                                        const statusConfig = getStatusConfig(tx.status);
+                                        const { amount, isIncome } = getAmountDisplay(tx);
+                                        return (
+                                            <div
+                                                key={tx.id}
+                                                onClick={handleViewMoreRecent}
+                                                className="px-6 py-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                                            >
+                                                {/* 第一行：状态标签 + 日期 + 金额（与账目管理页面移动端对齐） */}
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap shrink-0 ${statusConfig.className}`}>
+                                                            {statusConfig.label}
+                                                        </span>
+                                                        <span className="text-sm text-gray-500">{formatDate(tx.transaction_date)}</span>
+                                                    </div>
+                                                    <span className={`text-sm font-semibold shrink-0 ${isIncome ? 'text-blue-600' : 'text-red-500'}`}>
+                                                        {isIncome ? '+' : '-'}{formatAmount(amount)}
+                                                    </span>
+                                                </div>
 
-                        <Link
-                            to="/reports"
-                            state={{ reportType: 'ledger' }}
-                            className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-gray-200 hover:border-purple-300 hover:shadow-lg hover:shadow-purple-500/10 transition-all group"
-                        >
-                            <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center group-hover:bg-purple-500 transition-colors">
-                                <FileText className="w-6 h-6 text-purple-600 group-hover:text-white transition-colors" />
-                            </div>
-                            <div className="text-left">
-                                <h3 className="font-semibold text-gray-900">生成総勘定元帳</h3>
-                                <p className="text-sm text-gray-500">按科目查看明细</p>
-                            </div>
-                            <ArrowRight className="w-5 h-5 text-gray-400 ml-auto group-hover:text-purple-500 transition-colors" />
-                        </Link>
-
-                        <Link
-                            to="/reports"
-                            state={{ reportType: 'monthly_chart' }}
-                            className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-gray-200 hover:border-violet-300 hover:shadow-lg hover:shadow-violet-500/10 transition-all group"
-                        >
-                            <div className="w-12 h-12 bg-violet-100 rounded-xl flex items-center justify-center group-hover:bg-violet-500 transition-colors">
-                                <TrendingUp className="w-6 h-6 text-violet-600 group-hover:text-white transition-colors" />
-                            </div>
-                            <div className="text-left">
-                                <h3 className="font-semibold text-gray-900">月度统计图表</h3>
-                                <p className="text-sm text-gray-500">按月查看收支趋势</p>
-                            </div>
-                            <ArrowRight className="w-5 h-5 text-gray-400 ml-auto group-hover:text-violet-500 transition-colors" />
-                        </Link>
+                                                {/* 第二行：科目/描述 */}
+                                                <p className="text-sm font-medium text-gray-900 truncate">{tx.description || getAccountName(tx)}</p>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="px-6 py-12 text-center">
+                                    <p className="text-gray-500">暂无账目记录</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </section>
+
+                    {/* 右侧：快捷操作 + 財務諸表 */}
+                    <div className="space-y-4">
+                        {/* 快捷操作 */}
+                        <div className="bg-white rounded-2xl border border-gray-200 p-5">
+                            <h3 className="font-semibold text-gray-900 mb-4">快捷操作</h3>
+                            <div className="space-y-3">
+                                <button
+                                    onClick={() => navigate('/transactions', { state: { openCreate: true } })}
+                                    className="w-full flex items-center gap-3 p-3 rounded-xl bg-blue-50 hover:bg-blue-100 transition-colors group"
+                                >
+                                    <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                                        <Plus className="w-5 h-5 text-white" />
+                                    </div>
+                                    <span className="font-medium text-gray-900">新增账目</span>
+                                    <ArrowRight className="w-4 h-4 text-gray-400 ml-auto group-hover:text-blue-500 transition-colors" />
+                                </button>
+                                <Link
+                                    to="/reports"
+                                    state={{ reportType: 'monthly_chart' }}
+                                    className="w-full flex items-center gap-3 p-3 rounded-xl bg-violet-50 hover:bg-violet-100 transition-colors group"
+                                >
+                                    <div className="w-10 h-10 bg-violet-500 rounded-lg flex items-center justify-center">
+                                        <TrendingUp className="w-5 h-5 text-white" />
+                                    </div>
+                                    <span className="font-medium text-gray-900">月度收入支出统计表</span>
+                                    <ArrowRight className="w-4 h-4 text-gray-400 ml-auto group-hover:text-violet-500 transition-colors" />
+                                </Link>
+                            </div>
+                        </div>
+
+                        {/* 財務諸表 */}
+                        <div className="bg-white rounded-2xl border border-gray-200 p-5">
+                            <h3 className="font-semibold text-gray-900 mb-4">生成財務諸表</h3>
+                            <div className="space-y-3">
+                                <Link
+                                    to="/reports"
+                                    state={{ reportType: 'trial_balance' }}
+                                    className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 transition-all group"
+                                >
+                                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                        <FileText className="w-5 h-5 text-blue-600" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h4 className="font-medium text-gray-900">試算表</h4>
+                                        <p className="text-xs text-gray-500">各仕訳科目的借贷合计和余额</p>
+                                    </div>
+                                    <span className="text-xs text-blue-600 font-medium px-2 py-1 bg-blue-100 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                                        查看
+                                    </span>
+                                </Link>
+
+                                <Link
+                                    to="/reports"
+                                    state={{ reportType: 'ledger' }}
+                                    className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 hover:border-purple-300 hover:bg-purple-50/50 transition-all group"
+                                >
+                                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                                        <FileText className="w-5 h-5 text-purple-600" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h4 className="font-medium text-gray-900">総勘定元帳</h4>
+                                        <p className="text-xs text-gray-500">按仕訳科目记录所有账目明细</p>
+                                    </div>
+                                    <span className="text-xs text-purple-600 font-medium px-2 py-1 bg-purple-100 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                                        查看
+                                    </span>
+                                </Link>
+
+                                <Link
+                                    to="/reports"
+                                    state={{ reportType: 'journal' }}
+                                    className="flex items-center gap-4 p-4 rounded-xl border border-gray-200 hover:border-amber-300 hover:bg-amber-50/50 transition-all group"
+                                >
+                                    <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                                        <FileText className="w-5 h-5 text-amber-600" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h4 className="font-medium text-gray-900">仕訳帳</h4>
+                                        <p className="text-xs text-gray-500">账本，记录所有账目</p>
+                                    </div>
+                                    <span className="text-xs text-amber-600 font-medium px-2 py-1 bg-amber-100 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                                        查看
+                                    </span>
+                                </Link>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </Layout>
     );

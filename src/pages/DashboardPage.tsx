@@ -1,5 +1,5 @@
-import { ChevronDown, X } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { ChevronDown, Plus, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Layout } from '../components/layout/Layout';
 import { ExportButton } from '../components/transaction/ExportButton';
@@ -29,6 +29,7 @@ import type {
 
 const CACHE_KEY_PREFIX = 'journal_transactions_';
 const CACHE_KEY_UNINITIALIZED_PREFIX = 'journal_uninitialized_';
+const CACHE_KEY_MONTHLY_PREFIX = 'journal_monthly_';
 const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
 
 interface CachedData {
@@ -47,12 +48,14 @@ export function DashboardPage() {
     // 用户专属的缓存键
     const cacheKey = user?.uid ? `${CACHE_KEY_PREFIX}${user.uid}` : null;
     const uninitializedCacheKey = user?.uid ? `${CACHE_KEY_UNINITIALIZED_PREFIX}${user.uid}` : null;
+    const monthlyCacheKey = user?.uid ? `${CACHE_KEY_MONTHLY_PREFIX}${user.uid}` : null;
 
     // Data state
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
+    const [localSearchKeyword, setLocalSearchKeyword] = useState('');  // 本地搜索关键词
 
     // 页面标题类型
     const [titleType, setTitleType] = useState<PageTitleType>('recent');
@@ -152,6 +155,57 @@ export function DashboardPage() {
         }
     }, [uninitializedCacheKey]);
 
+    /**
+     * 检查账目ID是否在首页月度缓存中，如果在则清除缓存
+     * 不需要API调用，直接检查缓存内容
+     */
+    const clearMonthlyCacheIfNeeded = useCallback((transactionId: string) => {
+        if (!monthlyCacheKey) return;
+
+        try {
+            const cached = localStorage.getItem(monthlyCacheKey);
+            if (!cached) return; // 没有缓存就不用管
+
+            const { transactions }: CachedData = JSON.parse(cached);
+            if (!Array.isArray(transactions)) return;
+
+            // 检查账目ID是否在缓存中
+            const existsInCache = transactions.some(tx => tx.id === transactionId);
+            if (existsInCache) {
+                localStorage.removeItem(monthlyCacheKey);
+            }
+        } catch {
+            // Ignore cache errors
+        }
+    }, [monthlyCacheKey]);
+
+    /**
+     * 新建账目时，检查发生日期是否在本月，如果在则清除月度缓存
+     * 因为新账目需要被加入到首页的本月统计中
+     */
+    const clearMonthlyCacheByDate = useCallback((transactionDate?: string) => {
+        if (!monthlyCacheKey || !transactionDate) return;
+
+        try {
+            const cached = localStorage.getItem(monthlyCacheKey);
+            if (!cached) return; // 没有缓存就不用管
+
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth() + 1;
+
+            // 解析账目的发生日期 (YYYY-MM-DD)
+            const [txYear, txMonth] = transactionDate.split('-').map(Number);
+
+            // 如果账目发生日期在本月，清除月度缓存
+            if (txYear === currentYear && txMonth === currentMonth) {
+                localStorage.removeItem(monthlyCacheKey);
+            }
+        } catch {
+            // Ignore cache errors
+        }
+    }, [monthlyCacheKey]);
+
     // 页面加载时滚动到顶部
     useEffect(() => {
         window.scrollTo(0, 0);
@@ -206,6 +260,7 @@ export function DashboardPage() {
                 showToast('success', '账目创建成功');
                 setShowCreateModal(false);
                 clearUninitializedCache();
+                clearMonthlyCacheByDate(data.transaction_date);
                 setTitleType('recent');
                 loadTransactions(undefined, false);
             } else {
@@ -232,6 +287,7 @@ export function DashboardPage() {
             if (response.status === 'successed') {
                 showToast('success', '账目更新成功');
                 clearUninitializedCache();
+                clearMonthlyCacheIfNeeded(data.id);
                 setTitleType('recent');
                 loadTransactions(undefined, false);
             } else {
@@ -258,6 +314,8 @@ export function DashboardPage() {
 
         if (response.status === 'successed') {
             showToast('success', `成功删除 ${selectedIds.length} 条账目`);
+            // 检查是否有本月的账目被删除
+            selectedIds.forEach(id => clearMonthlyCacheIfNeeded(id));
             setSelectedIds([]);
             clearUninitializedCache();
             setTitleType('recent');
@@ -282,6 +340,8 @@ export function DashboardPage() {
 
         if (response.status === 'successed') {
             showToast('success', 'AI仕訳处理完成');
+            // 检查是否有本月的账目被处理
+            selectedIds.forEach(id => clearMonthlyCacheIfNeeded(id));
             setSelectedIds([]);
             clearUninitializedCache();
             setTitleType('recent');
@@ -361,12 +421,23 @@ export function DashboardPage() {
             case 'uninitialized':
                 return '未进行仕訳账目';
             case 'search':
-                return '搜索结果';
+                return '筛选结果';
             case 'recent':
             default:
-                return '最近更新账目';
+                return '近期编辑账目';
         }
     };
+
+    // 本地搜索过滤
+    const filteredTransactions = useMemo(() => {
+        if (!localSearchKeyword.trim()) {
+            return transactions;
+        }
+        const keyword = localSearchKeyword.toLowerCase();
+        return transactions.filter(tx =>
+            tx.description?.toLowerCase().includes(keyword)
+        );
+    }, [transactions, localSearchKeyword]);
 
     // 只有在初始加载时才显示全屏加载状态
     // 搜索时不显示全屏加载，防止 SearchPanel 被卸载导致状态丢失
@@ -390,32 +461,23 @@ export function DashboardPage() {
     }
 
     return (
-        <Layout>
+        <Layout wide>
             <div className="space-y-4">
-                {/* 账目筛选 + 新增按钮 */}
+                {/* 搜索面板 - 包含标题和操作 */}
                 <SearchPanel
                     onSearch={handleSearch}
                     onReset={handleReset}
                     onCreateNew={() => setShowCreateModal(true)}
+                    onLocalSearch={setLocalSearchKeyword}
                     loading={loading}
+                    title={getPageTitle()}
+                    count={filteredTransactions.length}
+                    showHint={selectedIds.length === 0}
                 />
-
-                {/* 结果标题 - 精简版 */}
-                <div className="flex items-center gap-3 flex-wrap">
-                    <h2 className="text-lg font-semibold text-gray-900">{getPageTitle()}</h2>
-                    <span className="text-sm text-gray-500">
-                        共 {transactions.length} 条
-                        {transactions.length > 0 && (
-                            <span className="text-gray-400 ml-2">
-                                *勾选后可批量进行 仕訳 / 导出 / 删除
-                            </span>
-                        )}
-                    </span>
-                </div>
 
                 {/* 数据表格 */}
                 <TransactionTable
-                    transactions={transactions}
+                    transactions={filteredTransactions}
                     selectedIds={selectedIds}
                     onSelectionChange={setSelectedIds}
                     onEdit={handleEdit}
@@ -424,7 +486,7 @@ export function DashboardPage() {
                 />
 
                 {/* 加载更多按钮 */}
-                {titleType === 'recent' && hasMore && transactions.length > 0 && (
+                {titleType === 'recent' && hasMore && filteredTransactions.length > 0 && !localSearchKeyword && (
                     <div className="mt-4 flex justify-center">
                         <Button
                             variant="secondary"
@@ -438,7 +500,7 @@ export function DashboardPage() {
                 )}
 
                 {/* 显示当前加载数量 */}
-                {titleType === 'recent' && transactions.length > 0 && (
+                {titleType === 'recent' && transactions.length > 0 && !localSearchKeyword && (
                     <p className="mt-2 text-center text-sm text-gray-400">
                         已加载 {transactions.length} 条账目
                         {!hasMore && '（已全部加载）'}
@@ -447,7 +509,18 @@ export function DashboardPage() {
 
                 {/* 底部占位，防止浮动操作栏遮挡内容 */}
                 {selectedIds.length > 0 && <div className="h-20" />}
+                {/* 移动端悬浮新增按钮占位 */}
+                <div className="lg:hidden h-20" />
             </div>
+
+            {/* 移动端悬浮新增按钮 (FAB) */}
+            <button
+                onClick={() => setShowCreateModal(true)}
+                className="lg:hidden fixed bottom-20 right-4 z-40 w-14 h-14 bg-sky-600 hover:bg-sky-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all active:scale-95"
+                aria-label="新增账目"
+            >
+                <Plus className="w-6 h-6" />
+            </button>
 
             {/* 底部浮动操作栏 - 选中时显示 */}
             {selectedIds.length > 0 && (

@@ -33,11 +33,11 @@ export interface Transaction {
 
 export type TransactionStatus = 'initialized' | 'journaled' | 'updated';
 
-// Status labels in Chinese
+// Status labels in Chinese (精简版)
 export const STATUS_LABELS: Record<TransactionStatus, string> = {
-    initialized: 'AI未处理',
-    journaled: 'AI已处理',
-    updated: '手动修改'
+    initialized: '未仕訳',
+    journaled: '已仕訳',
+    updated: '修改'
 };
 
 // Status colors for badges
