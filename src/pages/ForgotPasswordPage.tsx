@@ -82,7 +82,7 @@ export function ForgotPasswordPage() {
                         <div className="w-12 h-12 bg-gradient-to-br from-sky-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-sky-500/30">
                             <BookOpen className="w-6 h-6 text-white" />
                         </div>
-                        <span className="text-2xl font-bold text-gray-900">AI仕訳</span>
+                        <span className="text-2xl font-bold text-gray-900">财会助手 Rigel</span>
                     </Link>
                 </div>
 
@@ -133,9 +133,14 @@ export function ForgotPasswordPage() {
                 </div>
 
                 {/* 底部版权 */}
-                <p className="mt-8 text-center text-xs text-gray-400">
-                    © 2024 AI仕訳. All rights reserved.
-                </p>
+                <div className="mt-8 text-center">
+                    <p className="text-xs text-gray-400 mb-1">
+                        © 2026 Finance Copilot Rigel. All rights reserved.
+                    </p>
+                    <p className="text-xs text-gray-300">
+                        Powered by Nebula Infinity AI Solution
+                    </p>
+                </div>
             </div>
         </div>
     );

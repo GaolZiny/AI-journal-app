@@ -1,9 +1,11 @@
-# AI仕訳 | Journal Entry App
+# 财会助手 Rigel
 
-智能账目管理与仕訳处理应用，基于 React + TypeScript 构建，支持 AI 智能识别和自动化仕訳。
+智能账目管理与仕訳处理系统，基于 React + TypeScript 构建，支持 AI 智能识别和自动化仕訳。
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)
+
+> Powered by **Nebula Infinity AI Solution**
 
 ## ✨ 功能特点
 
@@ -52,8 +54,8 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/YOUR_USERNAME/ai-journal-app.git
-cd ai-journal-app
+git clone https://github.com/YOUR_USERNAME/regel.git
+cd regel
 
 # 安装依赖
 npm install
@@ -73,7 +75,7 @@ npm run dev
 
 ```bash
 # 拉取镜像
-docker pull ghcr.io/YOUR_USERNAME/ai-journal-app:latest
+docker pull ghcr.io/YOUR_USERNAME/regel:latest
 
 # 使用 docker-compose
 docker-compose up -d
@@ -83,7 +85,7 @@ docker-compose up -d
 
 ```bash
 # 构建镜像
-docker build -t ai-journal-app .
+docker build -t regel .
 
 # 运行容器
 docker run -d -p 3000:80 \
@@ -94,7 +96,7 @@ docker run -d -p 3000:80 \
   -e VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id \
   -e VITE_FIREBASE_APP_ID=your_app_id \
   -e VITE_N8N_BASE_URL=http://your-n8n:5678 \
-  ai-journal-app
+  regel
 ```
 
 ## ⚙️ 环境变量
@@ -132,3 +134,7 @@ docker run -d -p 3000:80 \
 ## 📄 License
 
 MIT License - 详见 [LICENSE](LICENSE) 文件
+
+---
+
+**Finance Copilot Rigel** © 2026 | Powered by Nebula Infinity AI Solution

@@ -51,7 +51,7 @@ export function Navigation() {
                                     <BookOpen className="w-5 h-5 text-white" />
                                 </div>
                                 <span className="text-lg font-semibold text-gray-900">
-                                    AI仕訳
+                                    财会助手 Rigel
                                 </span>
                             </Link>
 
@@ -135,7 +135,7 @@ export function Navigation() {
                             <BookOpen className="w-4 h-4 text-white" />
                         </div>
                         <span className="text-base font-semibold text-gray-900">
-                            AI仕訳
+                            财会助手 Rigel
                         </span>
                     </Link>
 
