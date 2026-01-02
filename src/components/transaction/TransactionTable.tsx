@@ -460,8 +460,8 @@ function MobileTransactionCard({
                                 {formatDate(tx.transaction_date)}
                             </span>
                         </div>
-                        <span className={`text-base font-bold ${isIncome ? 'text-emerald-600' : 'text-gray-900'}`}>
-                            {isIncome ? '+' : ''}{formatAmount(totalAmount)}
+                        <span className={`text-base font-bold ${isIncome ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {isIncome ? '+' : '-'}{formatAmount(totalAmount)}
                         </span>
                     </div>
 
@@ -490,7 +490,7 @@ function MobileTransactionCard({
                         </button>
                         <div className="flex items-center gap-3">
                             <span className="text-xs text-gray-400">
-                                {formatDate(tx.updated_at)}
+                                {formatDate(tx.updated_at)} 更新
                             </span>
                             <button
                                 onClick={onEdit}
@@ -515,9 +515,21 @@ function MobileTransactionCard({
                                 <span className="text-gray-500">貸方：{tx.credit_item || '-'}</span>
                                 <span className="text-emerald-600 font-medium">{formatAmount(tx.credit_amount)}</span>
                             </div>
-                            {/* 税区分 + 支付方式 */}
+                            {/* 税 + 支付方式 */}
                             <div className="flex items-center justify-between">
-                                <span className="text-gray-500">税区分：{getCtRateLabel(tx.ct_rate)}</span>
+                                <span className="text-gray-500">
+                                    税：{(() => {
+                                        const taxAmount = (tx.debit_ct || 0) > 0 ? tx.debit_ct : tx.credit_ct;
+                                        switch (tx.ct_rate) {
+                                            case 0: return '非课税';
+                                            case 1: return `8%（${formatAmount(taxAmount)}）`;
+                                            case 2: return `10%（${formatAmount(taxAmount)}）`;
+                                            case 3: return `混合（${formatAmount(taxAmount)}）`;
+                                            case 4: return `其他（${formatAmount(taxAmount)}）`;
+                                            default: return '-';
+                                        }
+                                    })()}
+                                </span>
                                 <span className="text-gray-700">{tx.fin_type ? FIN_TYPE_LABELS[tx.fin_type as 1 | 2 | 3 | 4 | 5] : '-'}</span>
                             </div>
                         </div>

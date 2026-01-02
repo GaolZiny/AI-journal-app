@@ -527,10 +527,10 @@ export function DashboardPage() {
                 <div className="fixed bottom-0 left-0 right-0 z-50 animate-slide-up">
                     {/* 移动端底部导航栏安全区域 */}
                     <div className="bg-white border-t border-gray-200 shadow-lg pb-safe">
-                        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3">
-                            <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-1 sm:gap-2">
-                                    <span className="text-sm font-medium text-sky-700 bg-sky-100 px-3 py-1 rounded-full whitespace-nowrap">
+                        <div className="max-w-7xl mx-auto px-2 sm:px-4 py-2 sm:py-3">
+                            <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <span className="text-xs sm:text-sm font-medium text-sky-700 bg-sky-100 px-2 sm:px-3 py-1 rounded-full whitespace-nowrap">
                                         已选 {selectedIds.length} 条
                                     </span>
                                     <button
@@ -542,11 +542,11 @@ export function DashboardPage() {
                                     </button>
                                 </div>
 
-                                <div className="flex items-center gap-1 sm:gap-2">
+                                <div className="flex items-center gap-1 sm:gap-2 min-w-0">
                                     <Button
                                         variant="secondary"
                                         onClick={() => setShowAIConfirm(true)}
-                                        className="w-24 justify-center"
+                                        className="px-2 sm:px-4 text-xs sm:text-sm justify-center whitespace-nowrap"
                                     >
                                         AI仕訳
                                     </Button>
@@ -555,13 +555,13 @@ export function DashboardPage() {
                                         transactions={transactions}
                                         selectedIds={selectedIds}
                                         dropUp
-                                        className="w-24"
+                                        className="px-2 sm:px-4 text-xs sm:text-sm"
                                     />
 
                                     <Button
                                         variant="danger"
                                         onClick={() => setShowDeleteConfirm(true)}
-                                        className="w-24 justify-center"
+                                        className="px-2 sm:px-4 text-xs sm:text-sm justify-center whitespace-nowrap"
                                     >
                                         删除
                                     </Button>

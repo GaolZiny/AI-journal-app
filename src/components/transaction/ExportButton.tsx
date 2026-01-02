@@ -133,12 +133,12 @@ export function ExportButton({ transactions, selectedIds, disabled = false, drop
 
     return (
         <>
-            <div className={`relative ${className}`} ref={dropdownRef}>
+            <div className="relative" ref={dropdownRef}>
                 <Button
                     variant="secondary"
                     onClick={() => setShowDropdown(!showDropdown)}
                     disabled={disabled}
-                    className="w-full justify-center"
+                    className={`justify-center whitespace-nowrap ${className}`}
                 >
                     <span className="inline-flex items-center gap-1">
                         导出
