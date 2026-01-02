@@ -346,7 +346,6 @@ export function TransactionTable({
                             onEdit={() => onEdit(tx)}
                             formatDate={formatDate}
                             formatAmount={formatAmount}
-                            getCtRateLabel={getCtRateLabel}
                         />
                     ))}
                 </div>
@@ -414,7 +413,6 @@ interface MobileTransactionCardProps {
     onEdit: () => void;
     formatDate: (date: string | undefined | null) => string;
     formatAmount: (amount: number | undefined | null) => string;
-    getCtRateLabel: (rate: number | undefined | null) => string;
 }
 
 function MobileTransactionCard({
@@ -423,8 +421,7 @@ function MobileTransactionCard({
     onSelect,
     onEdit,
     formatDate,
-    formatAmount,
-    getCtRateLabel
+    formatAmount
 }: MobileTransactionCardProps) {
     const [expanded, setExpanded] = useState(false);
 

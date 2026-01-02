@@ -390,33 +390,59 @@ export function HomePage() {
                         </div>
 
                         {/* AI仕訳助手卡片 */}
-                        <div
-                            onClick={handleViewAllUninitialized}
-                            className="bg-gradient-to-br from-emerald-500 to-teal-400 rounded-2xl p-5 text-white cursor-pointer hover:shadow-lg hover:shadow-emerald-500/20 transition-all"
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center shrink-0">
-                                    <Bot className="w-6 h-6" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="font-semibold">AI 仕訳助手</h3>
-                                    {uninitializedCount > 0 ? (
+                        {uninitializedCount > 0 ? (
+                            // 有未仕訳账目：显示完整卡片
+                            <div
+                                onClick={handleViewAllUninitialized}
+                                className="bg-gradient-to-br from-emerald-500 to-teal-400 rounded-2xl p-5 text-white cursor-pointer hover:shadow-lg hover:shadow-emerald-500/20 transition-all"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center shrink-0">
+                                        <Bot className="w-6 h-6" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-semibold">AI 仕訳助手</h3>
                                         <p className="text-emerald-100 text-sm mt-1">
                                             有 {uninitializedCount} 条需要进行 AI 仕訳
                                         </p>
-                                    ) : (
-                                        <p className="text-emerald-100 text-sm mt-1">
-                                            所有仕訳已处理完成 ✓
-                                        </p>
-                                    )}
-                                </div>
-                                {uninitializedCount > 0 && (
+                                    </div>
                                     <button className="px-4 py-1.5 bg-white text-emerald-600 text-sm font-medium rounded-lg hover:bg-emerald-50 transition-colors shrink-0">
                                         立即处理
                                     </button>
-                                )}
+                                </div>
                             </div>
-                        </div>
+                        ) : (
+                            // 所有仕訳已完成：显示紧凑版 + 快捷报表按钮
+                            <div className="bg-gradient-to-br from-emerald-500 to-teal-400 rounded-2xl p-4 text-white">
+                                <div className="flex items-center justify-between gap-2">
+                                    {/* 左侧：状态显示 */}
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <div className="w-9 h-9 bg-white/20 backdrop-blur rounded-lg flex items-center justify-center shrink-0">
+                                            <Bot className="w-4 h-4" />
+                                        </div>
+                                        <p className="text-white font-medium text-sm whitespace-nowrap">
+                                            所有仕訳已完成 <span className="text-emerald-200">✓</span>
+                                        </p>
+                                    </div>
+
+                                    {/* 右侧：快捷报表按钮 */}
+                                    <Link
+                                        to="/reports"
+                                        state={{
+                                            reportType: 'monthly_chart',
+                                            autoGenerate: true,
+                                            period: 'last6months'
+                                        }}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 backdrop-blur rounded-lg transition-colors shrink-0"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <TrendingUp className="w-4 h-4" />
+                                        <span className="text-sm font-medium whitespace-nowrap">近6月收支</span>
+                                        <ChevronRight className="w-4 h-4" />
+                                    </Link>
+                                </div>
+                            </div>
+                        )}
 
                         {/* 近期编辑账目 */}
                         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">

@@ -224,11 +224,25 @@ export function MonthlyChartPanel({ data, dateFrom, dateTo }: MonthlyChartPanelP
             }
         });
 
-        // 生成所有月份列表
+        // 生成所有月份列表（只包含有数据的范围）
+        // 找到数据中最早和最晚的月份
+        const dataMonths = Array.from(monthMap.keys()).sort();
+
+        // 如果没有数据，返回空
+        if (dataMonths.length === 0) {
+            return { monthlyData: [], accounts: [] };
+        }
+
+        // 使用数据中的实际月份范围，而不是传入的日期范围
+        const firstDataMonth = dataMonths[0];
+        const lastDataMonth = dataMonths[dataMonths.length - 1];
+
         const allMonths: string[] = [];
-        const startDate = new Date(dateFrom);
-        const endDate = new Date(dateTo);
-        const current = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+        const [startYear, startMonth] = firstDataMonth.split('-').map(Number);
+        const [endYear, endMonth] = lastDataMonth.split('-').map(Number);
+
+        const current = new Date(startYear, startMonth - 1, 1);
+        const endDate = new Date(endYear, endMonth - 1, 1);
 
         while (current <= endDate) {
             const monthStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
@@ -518,7 +532,7 @@ export function MonthlyChartPanel({ data, dateFrom, dateTo }: MonthlyChartPanelP
 
             {/* 底部图例说明 */}
             <div className="px-4 sm:px-6 py-3 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100">
-                <div className="flex items-center justify-center gap-4 sm:gap-6">
+                <div className="flex items-center justify-center gap-4 sm:gap-6 mb-1.5">
                     <div className="flex items-center gap-1.5">
                         <div className="w-3 h-3 rounded-sm bg-gradient-to-r from-emerald-400 to-cyan-400"></div>
                         <span className="text-xs sm:text-sm text-gray-600">収入（上方）</span>
@@ -528,6 +542,9 @@ export function MonthlyChartPanel({ data, dateFrom, dateTo }: MonthlyChartPanelP
                         <span className="text-xs sm:text-sm text-gray-600">支出（下方）</span>
                     </div>
                 </div>
+                <p className="text-center text-xs text-gray-400">
+                    ※ 仅显示对象期间内有账目记录的月份
+                </p>
             </div>
         </div>
     );
